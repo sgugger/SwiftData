@@ -6,10 +6,10 @@ public protocol BatcherConfig {
     associatedtype RawBatch
     associatedtype Batch
     
-    func processItem(_ item: Item) -> Sample
+    func processItem   (_ item:    Item)     -> Sample
     func processSamples(_ samples: [Sample]) -> [Sample]
-    func collate(_ samples: [Sample]) -> RawBatch 
-    func processBatch(_ batch: RawBatch) -> Batch
+    func collateSamples(_ samples: [Sample]) -> RawBatch 
+    func processBatch  (_ batch:   RawBatch) -> Batch
 }
 
 public struct Batcher<C>: Sequence where C: BatcherConfig {
@@ -60,8 +60,20 @@ public struct BatchIterator<C>: IteratorProtocol where C: BatcherConfig {
                 b.config.processItem(b.dataset[indices[$0]])
             }
             pos = end
-            return b.config.collate(b.config.processSamples(samples))
+            return b.config.collateSamples(b.config.processSamples(samples))
         }
         return b.config.processBatch(batch)
     }
+}
+
+public extension BatcherConfig where Item == Sample {
+    func processItem(_ item: Item) -> Sample { return item }
+}
+
+public extension BatcherConfig {
+    func processSamples(_ samples: [Sample]) -> [Sample] { return samples }
+}
+
+public extension BatcherConfig where RawBatch == Batch {
+    func processBatch(_ batch: RawBatch) -> Batch { return batch }
 }
