@@ -67,7 +67,7 @@ public struct TextClassificationTemplate<Item>: BatcherTemplate {
     }
 }
 
-public struct LanguageModelBatcherTemplate<Item>: BatcherTemplate {
+public struct LanguageModelTemplate<Item>: BatcherTemplate {
     public typealias Sample   = [Int]
     public typealias Batch    = (Tensor<Int32>, Tensor<Int32>)
     public typealias RawBatch = (Tensor<Int32>, Tensor<Int32>)
