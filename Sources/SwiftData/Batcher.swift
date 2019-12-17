@@ -6,10 +6,10 @@ public protocol BatcherTemplate {
     associatedtype RawBatch
     associatedtype Batch
     
-    func sampleIndices (_ dataset: [Item], shuffled: Bool) -> [Int]
-    func samplesCount(_ dataset: [Item]) -> Int
+    func sampleIndices(on dataset: [Item], shuffled: Bool) -> [Int]
+    func samplesCount(of dataset: [Item]) -> Int
     func processItem(_ item:    Item) -> Sample
-    func createSample(_ dataset: [Item], _ index: Int) -> Sample
+    func createSample(in dataset: [Item], with indices: [Int], at index: Int) -> Sample
     func processSamples(_ samples: [Sample]) -> [Sample]
     func collateSamples(_ samples: [Sample]) -> RawBatch 
     func processBatch (_ batch:   RawBatch) -> Batch
@@ -24,7 +24,7 @@ public struct Batcher<T>: Sequence where T: BatcherTemplate {
     public var dropLast: Bool = false
     
     public var count: Int {
-        let nSamples = template.samplesCount(dataset)
+        let nSamples = template.samplesCount(of: dataset)
         return nSamples / batchSize + (nSamples % batchSize == 0 || dropLast ? 0 : 1)
     }
     
@@ -46,22 +46,24 @@ public struct Batcher<T>: Sequence where T: BatcherTemplate {
 public struct BatchIterator<T>: IteratorProtocol where T: BatcherTemplate {
     let b: Batcher<T>
     let indices: [Int]
+    let samplesCount: Int
     var pos: Int = 0
     
     init(_ b: Batcher<T>) { 
         self.b = b
         pos = 0
-        indices = b.template.sampleIndices(b.dataset, shuffled: b.shuffle)
+        indices = b.template.sampleIndices(on: b.dataset, shuffled: b.shuffle)
+        samplesCount = b.template.samplesCount(of: b.dataset)
     }
     
     public mutating func next() -> T.Batch? {
-        guard pos < b.dataset.count else { return nil }
-        let end = min(pos + b.batchSize, b.dataset.count)
+        guard pos < samplesCount else { return nil }
+        let end = min(pos + b.batchSize, samplesCount)
         if (end - pos) < b.batchSize && b.dropLast { return nil }
         //The idea is to have samples processed and collated on the CPU before moving to the host, not sure this is the right way.
         let batch = withDevice(.cpu) { () -> T.RawBatch in
             let samples = Array(pos..<end).concurrentMap(nthreads: b.numWorkers) {
-                b.template.createSample(b.dataset, indices[$0])
+                b.template.createSample(in: b.dataset, with: indices, at: $0)
             }
             pos = end
             return b.template.collateSamples(b.template.processSamples(samples))
@@ -71,15 +73,17 @@ public struct BatchIterator<T>: IteratorProtocol where T: BatcherTemplate {
 }
 
 public extension BatcherTemplate {
-    func sampleIndices (_ dataset: [Item], shuffled: Bool) -> [Int] {
+    func sampleIndices(on dataset: [Item], shuffled: Bool) -> [Int] {
         return shuffled ? Array(0..<dataset.count).shuffled() : Array(0..<dataset.count)
     }
     
-    func samplesCount(_ dataset: [Item]) -> Int { return dataset.count }
+    func samplesCount(of dataset: [Item]) -> Int { return dataset.count }
     
     func processSamples(_ samples: [Sample]) -> [Sample] { return samples }
     
-    func createSample(_ dataset: [Item], _ index: Int) -> Sample { return processItem(dataset[index]) }
+    func createSample(in dataset: [Item], with indices: [Int], at index: Int) -> Sample {
+        return processItem(dataset[indices[index]])
+    }
 }
 
 public extension BatcherTemplate where Item == Sample {
