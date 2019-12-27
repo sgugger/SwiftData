@@ -1,24 +1,38 @@
 import TensorFlow
 
+//A basic dataset that lazily applies toInput and toTarget to an array of items
+//Returns a collection of TensorPair, so the functions must return tensors.
 public func basicDataset<Item, S1: TensorFlowScalar, S2: TensorFlowScalar> (
-    from items:[Item], 
+    from items: [Item], 
     toInput: @escaping (Item) -> Tensor<S1>,
-    toTarget: @escaping (Item) -> Tensor<S2>) -> LazyMapSequence<[Item], (Tensor<S1>, Tensor<S2>)> {
-    return items.lazy.map { (toInput($0), toTarget($0)) }
+    toTarget: @escaping (Item) -> Tensor<S2>) -> LazyMapSequence<[Item], TensorPair<S1,S2>> {
+    return items.lazy.map { TensorPair(input: toInput($0), target: toTarget($0)) }
 }
 
+//Build a dataset suitable for language modeling from an array of texts
 public struct LanguageModelDataset<Item>: Collection {
     public typealias Index = Int
-    public typealias Element = (Tensor<Int32>, Tensor<Int32>)
+    public typealias Element = TensorPair<Int32,Int32>
     
+    //A function that reads Item to get an array of Int
     public let openItem: (Item) -> [Int]
+    //The size of a batch
     public var batchSize: Int
+    //The length of a sequence
     public var sequenceLength: Int
-    public var items: [Item]
-    public var lengths: [Int]
+    //The array of raw items to use
+    public let items: [Item]
+    //The length of each processed item
+    public let lengths: [Int]
+    //The length of a contiguous chunk of text
     private var batchLength: Int
+    //The number of batches
     private var batchCount: Int
+    //The sequence length of the last batch
     private var lastLength: Int
+    //Indices used to iterate through the dataset
+    public var indices: [Int]
+    //Cumulative lengths
     private var cumLengths: [Int]
     //To conform to Collection
     public var startIndex: Int { return 0 }
@@ -31,10 +45,11 @@ public struct LanguageModelDataset<Item>: Collection {
                 lengths: [Int]) {
         (self.openItem, self.batchSize, self.sequenceLength) = (openItem, batchSize, sequenceLength)
         (self.items, self.lengths) = (items, lengths)
-        batchLength = (lengths.reduce(0, +) - 1) / batchSize
+        cumLengths = lengths.reduce(into: []) { $0.append(($0.last ?? 0) + $1) }
+        batchLength = (cumLengths.last! - 1) / batchSize
         batchCount = batchLength / sequenceLength + (batchLength % sequenceLength == 0 ? 0 : 1)
         lastLength = batchLength - (batchCount - 1) * sequenceLength
-        cumLengths = lengths.reduce(into: []) { $0.append(($0.last ?? 0) + $1) }
+        indices = Array(0..<items.count)
     }
     
     public init(openItem: @escaping (Item) -> [Int],
@@ -49,21 +64,22 @@ public struct LanguageModelDataset<Item>: Collection {
     public func index(after i: Int) -> Int { return i+1 }
 
     // Required subscript for Collection
-    public subscript(index: Int) -> Iterator.Element { get {
+    public subscript(index: Int) -> TensorPair<Int32,Int32> { get {
         let sampleLength = index / batchSize == batchCount - 1 ? lastLength : sequenceLength
         let startIndex = (index % batchSize) * batchLength + (index / batchSize) * sequenceLength
         let sample = readItems(from: startIndex, to: startIndex + sampleLength + 1)
         let sample32 = sample.map { Int32($0) }
-        return (Tensor<Int32>(sample32.prefix(upTo: sampleLength)), 
-                Tensor<Int32>(sample32.suffix(from: 1))) }
+        return TensorPair(input:  Tensor<Int32>(sample32.prefix(upTo: sampleLength)), 
+                          target: Tensor<Int32>(sample32.suffix(from: 1))) }
     }
     
-    public func readItems(from start: Int, to end: Int) -> [Int] {
+    //Read a contiguous chunk of texts from start to end (may go througyh several items)
+    private func readItems(from start: Int, to end: Int) -> [Int] {
         var res: [Int] = []
         var index = cumLengths.firstIndex { $0 >= start }!
         var pos = start
         while pos < end {
-            let x = openItem(items[index])
+            let x = openItem(items[indices[index]])
             let cumLen = ([0] + cumLengths)[index]
             let readFrom = pos - cumLen
             let readUntil = Swift.min(end - cumLen, x.count)
@@ -73,4 +89,19 @@ public struct LanguageModelDataset<Item>: Collection {
         }
         return res
     }
+    
+    //Shuflle the dataset
+    public mutating func shuffle() {
+        indices = indices.shuffled()
+        cumLengths[0] = lengths[indices[0]]
+        for (i,j) in indices.suffix(from: 1).enumerated() {
+            cumLengths[i+1] = cumLengths[i] + lengths[j]
+        } 
+    }
+}
+
+//sampleIndices function to use in conjunction with a LanguageModelDataset
+public func languageModelSample<C>(on dataset: inout LanguageModelDataset<C>, shuffled: Bool) -> [Int] {
+    if shuffled { dataset.shuffle() }
+    return Array(0..<dataset.count)
 }
