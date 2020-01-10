@@ -5,7 +5,8 @@ import TensorFlow
 public func basicDataset<Item, S1: TensorFlowScalar, S2: TensorFlowScalar> (
     from items: [Item], 
     toInput: @escaping (Item) -> Tensor<S1>,
-    toTarget: @escaping (Item) -> Tensor<S2>) -> LazyMapSequence<[Item], TensorPair<S1,S2>> {
+    toTarget: @escaping (Item) -> Tensor<S2>
+) -> LazyMapSequence<[Item], TensorPair<S1,S2>> {
     return items.lazy.map { TensorPair(input: toInput($0), target: toTarget($0)) }
 }
 
