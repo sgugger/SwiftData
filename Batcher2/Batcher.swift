@@ -71,12 +71,6 @@ where Template.SourceDataSet == SourceDataSet, SourceDataSet.Element: Collatable
     
     var indices: [Int]
     
-    /// Returns the number of batches contained in the `Batcher`.
-    public var count: Int {
-        let nSamples = dataset.count
-        return nSamples / batchSize + (nSamples % batchSize == 0 || droppingLast ? 0 : 1)
-    }
-    
     public init(
         with template: Template,
         on dataset: SourceDataSet, 
