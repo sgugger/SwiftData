@@ -44,7 +44,8 @@ Per https://machinelearningmastery.com/difference-between-a-batch-and-an-epoch/:
   
 - When training, if the batch size doesn't evenly divide the total number of
   samples, we typically drop the remainder, rather than training on a smaller
-  batch, because having a smaller batch interferes with BatchNorm.
+  batch, because having a smaller batch interferes with BatchNorm and give less accurate 
+  gradients.
   
 - When training, the ordering of samples must normally be randomized between
   epochs, to minimize the effect of ordering on results.
