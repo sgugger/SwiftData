@@ -30,7 +30,7 @@ Per https://machinelearningmastery.com/difference-between-a-batch-and-an-epoch/:
 - datasets can have uniform or non-uniform samples
 
 - A batch is ultimately processed as one tensor (for unsupervised training or
-  inference), or two tensors having the same shape (for supervised training),
+  inference), or two tensors having the same batch size (for supervised training),
   having rank one higher than that of the samples, with the added (“sample”)
   dimension indexing data corresponding to each sample.  The shape of the batch
   in the other dimensions is usually, but not always, the union of the shapes of
