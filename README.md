@@ -43,16 +43,17 @@ Per https://machinelearningmastery.com/difference-between-a-batch-and-an-epoch/:
   reshaping function that maps the sample to the batch slice.
   
 - When training, if the batch size doesn't evenly divide the total number of
-  samples, we typically (always?) drop the remainder, rather than padding the
-  last batch.
+  samples, we typically drop the remainder, rather than training on a smaller
+  batch, because having a smaller batch interferes with BatchNorm.
   
 - When training, the ordering of samples must normally be randomized between
   epochs, to minimize the effect of ordering on results.
   
-  Sometimes randomization must be specialized: in language models (GPT2), order
-  is randomized keeping phrases intact, then uniform samples are collected by
-  slicing the concatenation of the phrases into segments of a constant length,
-  with labels collected the same way at an offset of 1 token.
+  Sometimes randomization must be specialized: in language models (GPT2),
+  training data are sequences of words, order *among* (but not within) the
+  sequences is randomized, then uniform samples are collected by slicing the
+  concatenation of the the sequences into segments of a constant length, with
+  labels collected the same way at an offset of 1 token.
 
 - Processing the batch with the most data first during an epoch is a hack we use
   to avoid memory fragmentation.
@@ -63,5 +64,5 @@ Per https://machinelearningmastery.com/difference-between-a-batch-and-an-epoch/:
     data on average, which reduces the amount of computation required to
     process a batch.
     
-  - To do that, we sort each group of K*batchsize samples before dividing it
-    into K batches.
+  - To do that, after randomization, we sort each group of K*batchsize samples
+    before dividing it into K batches.
