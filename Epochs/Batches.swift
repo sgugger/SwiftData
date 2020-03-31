@@ -1,10 +1,17 @@
 public struct Batches<Batch, BatchSampleSet: Collection> {
+  /// The underlying samples.
+  let samples: BatchSampleSet
   /// The size of every batch, except possibly the last one.
   let batchSize: Int
   /// Returns a batch given the constituent batch samples.
   let makeBatch: (BatchSampleSet.SubSequence) -> Batch
-  /// The underlying samples.
-  let samples: BatchSampleSet
+  
+  public init(on samples: BatchSampleSet, batchSize: Int, 
+              makeBatch: @escaping (BatchSampleSet.SubSequence) -> Batch) {
+    self.samples = samples
+    self.batchSize = batchSize
+    self.makeBatch = makeBatch
+  }
 }
 
 extension Batches : Collection {
