@@ -68,7 +68,7 @@ Per https://machinelearningmastery.com/difference-between-a-batch-and-an-epoch/:
   - To do that, after randomization, we sort each group of K*batchsize samples
     before dividing it into K batches.
 
-## Specification
+## Procedure
 
 Input: base samples, maxBatchSize
 
@@ -77,9 +77,12 @@ Input: base samples, maxBatchSize
 3. if training: Drop remainder of batch samples
 4. if batch samples non-uniform: sort first K*batchSize batch samples by some
   sort key (typically size).
-  4.1. if inference: K = number of batches
-  4.2. if training: K = some smaller value so as not to destroy all randomness.
+  
+    4.1. if inference: K = number of batches  
+    4.2. if training: K = some smaller value so as not to destroy all randomness.
+  
 5. Repeatedly:
-  5.1 select first maxBatchSize batch samples
-  5.2 choose batch shape
-  5.3 create batch tensor by reshaping batch samples and stacking
+
+    5.1 select first maxBatchSize batch samples
+    5.2 choose batch shape
+    5.3 create batch tensor by reshaping batch samples and stacking
