@@ -8,12 +8,12 @@ let package = Package(
       .library( name: "Batcher", targets: ["Batcher"]),
       .library( name: "Batcher1", targets: ["Batcher1"]),
       .library( name: "Batcher2", targets: ["Batcher2"]),
-      .library( name: "Batcher3", targets: ["Batcher3"])
+      .library( name: "Epochs", targets: ["Epochs"])
     ],
     targets: [
       .target( name: "Batcher", path: "Batcher"),
       .target( name: "Batcher1", path: "Batcher1"),
       .target( name: "Batcher2", path: "Batcher2"),
-      .target( name: "Batcher3", path: "Batcher3")
+      .target( name: "Epochs", path: "Epochs")
     ]
 )

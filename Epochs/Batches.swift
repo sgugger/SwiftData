@@ -1,4 +1,4 @@
-struct Batches<Batch, BatchSampleSet: Collection> {
+public struct Batches<Batch, BatchSampleSet: Collection> {
   /// The size of every batch, except possibly the last one.
   let batchSize: Int
   /// Returns a batch given the constituent batch samples.
@@ -8,65 +8,33 @@ struct Batches<Batch, BatchSampleSet: Collection> {
 }
 
 extension Batches : Collection {
-  typealias Index = BatchSampleSet.Index
+  public typealias Index = BatchSampleSet.Index
   
-  var startIndex: BatchSampleSet.Index {
+  public var startIndex: BatchSampleSet.Index {
     return samples.startIndex
   }
 
-  var endIndex: BatchSampleSet.Index {
+  public var endIndex: BatchSampleSet.Index {
     return samples.endIndex
   }
 
-  func index(after i: Index) -> Index {
-    return samples.index(i, offsetBy: batchSize, limitedBy: endIndex)
+  public func index(after i: Index) -> Index {
+    return samples.index(i, offsetBy: batchSize, limitedBy: endIndex)!
   }
 
-  subscript(i: Index) -> Batch {
+  public subscript(i: Index) -> Batch {
     makeBatch(samples[i..<index(after: i)])
   }
 }
 
-func defaultMakeBatch<BatchSamples: Collection>(samples: BatchSamples)
+public func defaultMakeBatch<BatchSamples: Collection>(samples: BatchSamples)
     -> BatchSamples.Element
     where BatchSamples.Element: Collatable
 {
   return .init(collating: samples)
 }
 
-
-struct BatchSorted<Base: Collection> {
-  let base: Base
-  let batchSize: Int
-  let order: [Base.Index]
-  
-  init(
-      _ base: Base, batchSize: Int? = nil,
-      by areInOrder: (Base.Element, Base.Element)->Bool
-  ) {
-    self.base = base
-    self.batchSize = batchSize ?? base.count
-    var order = Array(base.indices)
-    
-    order.inParallelOverSlices(of: batchSize) {
-      batch: inout [Base.Index].SubSequence in
-      sort(batch) { areInOrder(base[$0], base[$1]) }
-    }
-  }
-}
-
-extension BatchSorted : Collection {
-  var startIndex: Int { order.startIndex }
-  var endIndex: Int { order.endIndex }
-  subscript(i: Int) -> Base.Element {
-    
-  }
-}
-
-//-------
-
-
-struct SelectedElements<Base: Collection, Order: Collection>
+public struct SelectedElements<Base: Collection, Order: Collection>
     where Order.Element == Base.Index
 {
   let base: Base
@@ -79,30 +47,31 @@ struct SelectedElements<Base: Collection, Order: Collection>
 }
 
 extension SelectedElements : Collection {
-  typealias Index = Order.Index
-  typealias Element = Base.Element
+  public typealias Index = Order.Index
+  public typealias Element = Base.Element
   
-  var startIndex: Index { order.startIndex }
+  public var startIndex: Index { order.startIndex }
   
-  var endIndex: Index { order.endIndex }
+  public var endIndex: Index { order.endIndex }
   
-  subscript(i: Index) -> Base.Element {
+  public subscript(i: Index) -> Base.Element {
     base[order[i]]
   }
 
-  func index(after i: Index) -> Index { order.index(after: i) }
+  public func index(after i: Index) -> Index { order.index(after: i) }
 }
 
-extension Collection {
+public extension Collection {
   func sortedInBatches(
-      batchSize: Int? = nil, by: by areInOrder: (Element, Element)->Bool
+      batchSize: Int? = nil, by areInOrder: (Element, Element)->Bool
   ) -> SelectedElements<Self, [Index]> {
     var order = Array(self.indices)
     
-    order.inParallelOverSlices(of: batchSize ?? self.count) {
-      batch: inout [Base.Index].SubSequence in
-      sort(batch) { areInOrder(base[$0], base[$1]) }
-    }
+    order.sort { areInOrder(self[$0], self[$1]) }
+    //order.inParallelOverSlices(of: batchSize ?? self.count) {
+    //  batch: inout [Base.Index].SubSequence in
+    //  sort(batch) { areInOrder(base[$0], base[$1]) }
+    //}
     
     return SelectedElements(self, order: order)
   }
