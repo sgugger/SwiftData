@@ -20,7 +20,7 @@ import Foundation
 // Implementations of `concurrentMap` 
 extension RandomAccessCollection {
     /// Returns `self.map(transform)`, computed in parallel on chunks of self 
-    /// of size `minBatchSize`.
+    /// of size `minBatchSize` or `minBatchSize + 1`.
     ///
     /// - Requires: `transform` is safe to call from multiple threads.
     func concurrentMap<B>(minBatchSize: Int = 1, _ transform: (Element) -> B) -> [B] {
