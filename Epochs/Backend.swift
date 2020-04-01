@@ -14,11 +14,7 @@
 
 import Foundation
 
-// The goal of this module is to add support for a parallel mapping on arrays
-// used by `Batcher` when iterating through batches.
-
-// Implementations of `concurrentMap` 
-extension RandomAccessCollection {
+extension Collection {
     /// Returns `self.map(transform)`, computed in parallel on chunks of self 
     /// of size `minBatchSize` or `minBatchSize + 1`.
     ///
