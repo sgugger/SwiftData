@@ -1,3 +1,5 @@
+import TensorFlow // for paddedAndCollated
+
 /// A collection of `Batch` whose elements are successive chunks of
 /// a sample set, lazily mapped through a batch creation closure.
 ///
@@ -58,48 +60,56 @@ extension Batches : Collection {
 extension Collection where Element: Collatable {
   /// The result of collating the elements of `self`.
   public var collated: Element { .init(collating: self) }
+
+  /// Returns the elements of `self`, padded to maximal shape with `padValue`
+  /// and collated.
+  public func collatedAndTailPadded<Scalar : Numeric>(
+      with padValue: Scalar
+  ) -> Element
+  where Element == Tensor<Scalar>
+  {
+    let firstShape = self.first!.shapeTensor
+    let otherShapes = self.dropFirst().lazy.map(\.shapeTensor)
+    let paddedShape
+        = otherShapes.reduce(firstShape) { TensorFlow.max($0, $1) }
+        .scalars.lazy.map { Int($0) }
+
+    let r = self.lazy.map { t in
+      t.padded(
+          forSizes: zip(t.shape, paddedShape).map {(before: 0, after: $1 - $0)},
+          with: padValue)
+    }
+    return r.collated
+  }
 }
 
-public struct SelectedElements<Base: Collection, Order: Collection>
-    where Order.Element == Base.Index
+// A weak substitute for a corresponding property on `Collection`, which we
+// can't define due to language limitations or the fact that we don't have a
+// tensor protocol (take your pick).
+/// Returns x.collatedAndPadded(with: 0).
+public func tailPaddedWith0AndCollated<C: Collection, S: Numeric>(_ x: C) -> Tensor<S>
+    where C.Element == Tensor<S>
 {
-  let base: Base
-  let order: Order
-  
-  init(_ base: Base, order: Order) {
-    self.base = base
-    self.order = order
-  }
-}
-
-extension SelectedElements : Collection {
-  public typealias Index = Order.Index
-  public typealias Element = Base.Element
-  
-  public var startIndex: Index { order.startIndex }
-  
-  public var endIndex: Index { order.endIndex }
-  
-  public subscript(i: Index) -> Base.Element {
-    base[order[i]]
-  }
-
-  public func index(after i: Index) -> Index { order.index(after: i) }
+  return x.collatedAndTailPadded(with: 0)
 }
 
 public extension Collection {
   func sortedInBatches(
-      batchSize: Int? = nil, by areInOrder: (Element, Element)->Bool
-  ) -> SelectedElements<Self, [Index]> {
-    var order = Array(self.indices)
-    
-    order.sort { areInOrder(self[$0], self[$1]) }
+      of batchSize: Int, by areInOrder: (Element, Element)->Bool
+  ) -> [Element] {
+    var r: [Element] = []
+    r.reserveCapacity(self.count)
+    var remaining = self[...]
+    while !remaining.isEmpty {
+      r += remaining.prefix(batchSize).sorted(by: areInOrder)
+      remaining = remaining.dropFirst(batchSize)
+    }
+    return r
+
     //order.inParallelOverSlices(of: batchSize ?? self.count) {
     //  batch: inout [Base.Index].SubSequence in
     //  sort(batch) { areInOrder(base[$0], base[$1]) }
     //}
-    
-    return SelectedElements(self, order: order)
   }
 }
 
