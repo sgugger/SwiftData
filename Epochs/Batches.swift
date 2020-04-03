@@ -111,6 +111,3 @@ public extension Collection {
     //}
   }
 }
-
-// x.dropLast(count % batchSize)
-
