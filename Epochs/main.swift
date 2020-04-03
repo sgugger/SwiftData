@@ -94,9 +94,9 @@ extension LanguageModelDataset: RandomAccessCollection {
 }
 
 //Let's create such a DataSet
-let numbers: [[Int]] = [[1,2,3,4,5], [6,7,8], [9,10,11,12,13,14,15], [16,17,18]]
+let texts: [[Int]] = [[1,2,3,4,5], [6,7,8], [9,10,11,12,13,14,15], [16,17,18]]
 do {
-  let dataset = LanguageModelDataset(texts: numbers, sequenceLength: 3)
+  let dataset = LanguageModelDataset(texts: texts, sequenceLength: 3)
 
   //Now let's look at what it gives us:
   let batches = Batches(of: 3, from: dataset, \.collated)
@@ -106,7 +106,7 @@ do {
 }
 
 do {
-  let dataset = LanguageModelDataset(texts: numbers.shuffled(), sequenceLength: 3)
+  let dataset = LanguageModelDataset(texts: texts.shuffled(), sequenceLength: 3)
   let batches = Batches(of: 3, from: dataset, \.collated)
   for b in batches {
     print(b)
