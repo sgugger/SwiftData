@@ -18,9 +18,8 @@ public struct Batches<BatchSampleSet: Collection, Batch> {
   /// Creates an instance that presents successive chunks, of size `batchSize`,
   /// from `samples`, lazily transformed by `transform`.
   ///
-  /// If `batchSize % samples.count != 0`, the final chunk presented to
-  /// `transform` will have fewer samples: `(samples.count - 1) % batchSize +
-  /// 1`.
+  /// - Note: if `batchSize % samples.count != 0`, the final chunk passed to
+  ///   `transform` will have only `samples.count % batchSize` samples.
   public init(
       of batchSize: Int, from samples: BatchSampleSet, 
       _ transform: @escaping (BatchSampleSet.SubSequence) -> Batch
