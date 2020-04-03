@@ -19,9 +19,7 @@ struct LinearCongruential: RandomNumberGenerator {
     // generators". arXiv:2001.05304 [cs.DS].)
     let a: UInt64 = 0xaf251af3b0f025b5
     let c: UInt64 = 1
-    lastValue = lastValue
-        .multipliedReportingOverflow(by: a).partialValue
-        .addingReportingOverflow(c).partialValue
+    lastValue = lastValue &* a &+ c
     return lastValue
   }
 }
