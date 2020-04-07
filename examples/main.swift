@@ -16,7 +16,11 @@ do {
   }
 
   // Enabling shuffle
-  let batches2 = Batches(of: 64, from: dataSet.shuffled(), \.collated)
+  // This should absolutely not be done this way because it traverses the collection:
+  // let batches2 = Batches(of: 64, from: dataSet.shuffled(), \.collated)
+  // We need to actually go back to raw collection:
+  let dataSet2 = rawItems.shuffled().lazy.map { _ in Tensor<Float>(randomNormal: [224, 224, 3]) }
+  let batches2 = Batches(of: 64, from: dataSet2, \.collated)  
   print(batches2.map(\.shape))
 }
 
