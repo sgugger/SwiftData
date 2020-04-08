@@ -6,7 +6,7 @@ import TensorFlow // for paddedAndCollated
 /// In typical use, `Batch` will consist of one (for inference/unsupervised
 /// training) or two (for supervised training) tensors, and the closure stacks
 /// the chunk of samples into a `Batch`, if necessary applying a transformation
-/// first to ensure they are uniform.
+/// first to ensure they are of the same sizes.
 public struct Batches<BatchSampleSet: Collection, Batch> {
   /// The underlying samples.
   private let samples: BatchSampleSet
@@ -44,7 +44,6 @@ extension Batches : Collection {
     return samples.endIndex
   }
 
-
   /// Returns the position immediately following `i`.
   public func index(after i: Index) -> Index {
     return samples.index(i, offsetBy: batchSize, limitedBy: endIndex)!
@@ -62,8 +61,8 @@ extension Collection where Element: Collatable {
 
   /// Returns the elements of `self`, padded to maximal shape with `padValue`
   /// and collated.
-  public func collatedAndTailPadded<Scalar : Numeric>(
-      with padValue: Scalar
+  public func paddedAndCollated<Scalar : Numeric>(
+      with padValue: Scalar, padFirst: Bool = false
   ) -> Element
   where Element == Tensor<Scalar>
   {
@@ -75,8 +74,9 @@ extension Collection where Element: Collatable {
 
     let r = self.lazy.map { t in
       t.padded(
-          forSizes: zip(t.shape, paddedShape).map {(before: 0, after: $1 - $0)},
-          with: padValue)
+        forSizes: zip(t.shape, paddedShape).map {
+          return (before: padFirst ? $1 - $0 : 0, after: padFirst ? 0 : $1 - $0)},
+        with: padValue)
     }
     return r.collated
   }
@@ -89,7 +89,7 @@ extension Collection where Element: Collatable {
 public func tailPaddedWith0AndCollated<C: Collection, S: Numeric>(_ x: C) -> Tensor<S>
     where C.Element == Tensor<S>
 {
-  return x.collatedAndTailPadded(with: 0)
+  return x.paddedAndCollated(with: 0)
 }
 
 public extension Collection {
