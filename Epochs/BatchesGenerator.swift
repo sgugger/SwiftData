@@ -8,13 +8,15 @@ public protocol SamplingProtocol {
   var shuffled: DataSet { get }
 }
 
-/// A collection built lazily on an array of `Raw` items
+/// A collection built on an array of `Raw` items
 public struct Samples<Raw, DataSet: Collection>: SamplingProtocol {
   /// The underlying raw items
   private let base: [Raw]
   /// Creates the `Dataset` form the raw items
   private let makeDataset: ([Raw]) -> DataSet
-    
+  
+  /// Creates an instance from `base` array of `Raw` items and a `makeDataset`
+  /// transform.
   public init(on base: [Raw], _ makeDataset: @escaping ([Raw]) -> DataSet) {
     self.base = base
     self.makeDataset = makeDataset
@@ -40,17 +42,20 @@ public struct BatchesGenerator<BatchSamples: SamplingProtocol, Batch> {
   public var batchSize: Int
   /// How to make a `Batch` from a slice of `BatchSampleSet`
   private let makeBatch: (BatchSampleSet.SubSequence) -> Batch
-    
+  
+  /// Creates an instance that will be able to generate `Batches` of `batchSize`
+  /// from `trainingSamples`and `validationSamples`, lazily transformed by 
+  /// `transform`.
   public init(
     of batchSize: Int,
     from trainingSamples: BatchSamples, 
     and validationSamples: BatchSamples,
-    _ makeBatch: @escaping (BatchSampleSet.SubSequence) -> Batch
+    _ transform: @escaping (BatchSampleSet.SubSequence) -> Batch
   ) {
     self.batchSize = batchSize
     self.trainingSamples = trainingSamples
     self.validationSamples = validationSamples
-    self.makeBatch = makeBatch
+    self.makeBatch = transform
   }
     
   /// Returns new `Batches` for training and validation, with a reshuffle of 
