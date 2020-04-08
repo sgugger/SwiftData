@@ -4,7 +4,7 @@ public protocol SamplingProtocol {
   associatedtype DataSet: Collection
   /// A non-shuffled version of `Self`
   var samples: DataSet { get }
-  /// A shuffeld version of `Self`
+  /// A shuffled version of `Self`
   var shuffled: DataSet { get }
 }
 
