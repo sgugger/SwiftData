@@ -4,9 +4,9 @@ import TensorFlow // for paddedAndCollated
 /// a sample set, lazily mapped through a batch creation closure.
 ///
 /// In typical use, `Batch` will consist of one (for inference/unsupervised
-/// training) or two (for supervised training) tensors, and the closure stacks
-/// the chunk of samples into a `Batch`, if necessary applying a transformation
-/// first to ensure they are of the same sizes.
+/// training) or two (for supervised or semi-supervised training) tensors, and 
+/// the closure stacks the chunk of samples into a `Batch`, if necessary 
+/// applying a transformation first to ensure they are of the same sizes.
 public struct Batches<BatchSampleSet: Collection, Batch> {
   /// The underlying samples.
   private let samples: BatchSampleSet
