@@ -92,22 +92,22 @@ public func tailPaddedWith0AndCollated<C: Collection, S: Numeric>(_ x: C) -> Ten
   return x.paddedAndCollated(with: 0)
 }
 
-public extension Collection {
-  func sortedInBatches(
-      of batchSize: Int, by areInOrder: (Element, Element)->Bool
-  ) -> [Element] {
-    var r: [Element] = []
-    r.reserveCapacity(self.count)
-    var remaining = self[...]
-    while !remaining.isEmpty {
-      r += remaining.prefix(batchSize).sorted(by: areInOrder)
-      remaining = remaining.dropFirst(batchSize)
-    }
-    return r
-
-    //order.inParallelOverSlices(of: batchSize ?? self.count) {
-    //  batch: inout [Base.Index].SubSequence in
-    //  sort(batch) { areInOrder(base[$0], base[$1]) }
-    //}
-  }
-}
+//public extension Collection {
+//  func sortedInBatches(
+//      of batchSize: Int, by areInOrder: (Element, Element)->Bool
+//  ) -> [Element] {
+//    var r: [Element] = []
+//    r.reserveCapacity(self.count)
+//    var remaining = self[...]
+//    while !remaining.isEmpty {
+//      r += remaining.prefix(batchSize).sorted(by: areInOrder)
+//      remaining = remaining.dropFirst(batchSize)
+//    }
+//    return r
+//
+//    //order.inParallelOverSlices(of: batchSize ?? self.count) {
+//    //  batch: inout [Base.Index].SubSequence in
+//    //  sort(batch) { areInOrder(base[$0], base[$1]) }
+//    //}
+//  }
+//}
