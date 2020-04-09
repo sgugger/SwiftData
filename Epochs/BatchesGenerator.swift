@@ -1,71 +1,66 @@
-/// For type that represent a `Collection` with a special shuffled method (that
-/// differs from the shuffled method provided by `Collection`).
-public protocol SamplingProtocol {
-  associatedtype DataSet: Collection
-  /// A non-shuffled version of `Self`
-  var samples: DataSet { get }
-  /// A shuffled version of `Self`
-  var shuffled: DataSet { get }
-}
+/// For type that represent how to build `Batches` from training or validation
+/// samples.
+public protocol BatchesMaker {
+  associatedtype Samples: Collection
+  associatedtype Batch
 
-/// A collection built on an array of `Raw` items
-public struct Samples<Raw, DataSet: Collection>: SamplingProtocol {
-  /// The underlying raw items
-  private let base: [Raw]
-  /// Creates the `Dataset` form the raw items
-  private let makeDataset: ([Raw]) -> DataSet
-  
-  /// Creates an instance from `base` array of `Raw` items and a `makeDataset`
-  /// transform.
-  public init(on base: [Raw], _ makeDataset: @escaping ([Raw]) -> DataSet) {
-    self.base = base
-    self.makeDataset = makeDataset
-  }
-    
-  /// A non-shuffled version of `Self`
-  public var samples: DataSet { makeDataset(base) }
-  /// A shuffled version of `Self`
-  public var shuffled: DataSet { makeDataset(base.shuffled()) }
+  func makeTraining(of batchSize: Int, from: Samples) -> Batches<Samples, Batch>
+  func makeValidation(of batchSize: Int, from: Samples) -> Batches<Samples, Batch>
 }
 
 /// An infinite generator of training and validation data in batches 
 ///
 /// - Note: if the `batchSize` changes during one epoch, it will only be
 ///   reflected at the next.
-public struct BatchesGenerator<BatchSamples: SamplingProtocol, Batch> {
-  public typealias BatchSampleSet = BatchSamples.DataSet
-  /// Training dataset
-  public let trainingSamples: BatchSamples
-  /// Validation dataset
-  public let validationSamples: BatchSamples
-  /// The batch size
+public struct BatchesGenerator<Maker: BatchesMaker> {
+  /// Training dataset.
+  public let training: Maker.Samples
+  /// Validation dataset.
+  public let validation: Maker.Samples
+  /// The batch size.
   public var batchSize: Int
-  /// How to make a `Batch` from a slice of `BatchSampleSet`
-  private let makeBatch: (BatchSampleSet.SubSequence) -> Batch
+  /// How to make a `Batch` from a slice of `BatchSampleSet`.
+  private let maker: Maker
   
   /// Creates an instance that will be able to generate `Batches` of `batchSize`
-  /// from `trainingSamples`and `validationSamples`, lazily transformed by 
-  /// `transform`.
+  /// from `training`and `validation` samples, using `maker`
   public init(
     of batchSize: Int,
-    from trainingSamples: BatchSamples, 
-    and validationSamples: BatchSamples,
-    _ transform: @escaping (BatchSampleSet.SubSequence) -> Batch
+    from training: Maker.Samples, 
+    and validation: Maker.Samples,
+    with maker: Maker
   ) {
     self.batchSize = batchSize
-    self.trainingSamples = trainingSamples
-    self.validationSamples = validationSamples
-    self.makeBatch = transform
+    self.training = training
+    self.validation = validation
+    self.maker = maker
   }
     
   /// Returns new `Batches` for training and validation, with a reshuffle of 
   /// the training data
   public func nextEpoch() -> (
-    training: Batches<BatchSampleSet, Batch>, 
-    validation: Batches<BatchSampleSet, Batch>
+    training: Batches<Maker.Samples, Maker.Batch>, 
+    validation: Batches<Maker.Samples, Maker.Batch>
   ) {
-    return (
-      training: Batches(of: batchSize, from: trainingSamples.shuffled, makeBatch), 
-      validation: Batches(of: batchSize, from: validationSamples.samples, makeBatch))
-    }
+  return (
+    training: maker.makeTraining(of: batchSize, from: training), 
+    validation: maker.makeValidation(of: batchSize, from: training))
+  }
+}
+
+public struct LazyBatchesMaker<RawSamples: RandomAccessCollection, Batch>: BatchesMaker {
+  public typealias Samples = ReindexedCollection<RawSamples>
+  private let makeBatch: (Samples.SubSequence) -> Batch
+ 
+  public init(makeBatch: @escaping (Samples.SubSequence) -> Batch) {
+    self.makeBatch = makeBatch
+  }
+    
+  public func makeTraining(of batchSize: Int, from samples: Samples) -> Batches<Samples, Batch> {
+    return Batches(of: batchSize, from: samples.innerShuffled(), makeBatch)
+  }
+    
+  public func makeValidation(of batchSize: Int, from samples: Samples) -> Batches<Samples, Batch> {
+    return Batches(of: batchSize, from: samples, makeBatch)
+  }
 }
