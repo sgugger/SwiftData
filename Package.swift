@@ -5,15 +5,15 @@ import PackageDescription
 let package = Package(
     name: "SwiftData",
     products: [
-      .library( name: "Batcher", targets: ["Batcher"]),
-      .library( name: "Batcher1", targets: ["Batcher1"]),
-      .library( name: "Batcher2", targets: ["Batcher2"]),
-      .library( name: "Epochs", targets: ["Epochs"])
+      .library(name: "Batcher", targets: ["Batcher"]),
+      .library(name: "Batcher1", targets: ["Batcher1"]),
+      .library(name: "Batcher2", targets: ["Batcher2"]),
+      .library(name: "Epochs", targets: ["Epochs"])
     ],
     targets: [
-      .target( name: "Batcher", path: "Batcher"),
-      .target( name: "Batcher1", path: "Batcher1"),
-      .target( name: "Batcher2", path: "Batcher2"),
-      .target( name: "Epochs", path: "Epochs")
+      .target(name: "Batcher", path: "Batcher"),
+      .target(name: "Batcher1", path: "Batcher1"),
+      .target(name: "Batcher2", path: "Batcher2"),
+      .target(name: "Epochs", path: "Epochs")
     ]
 )
