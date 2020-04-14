@@ -6,15 +6,35 @@ final class EpochsTests : XCTestCase {
   // Some raw items (for instance filenames)
   let rawItems: [Int] = Array(0..<512)
   
-  // Base use  
-  func test0() {
+  func testLazyShuffle() {
+    // A lazy dataset and an array that keeps track of whether the elements were
+    // accessed or not.
+    var accessed = rawItems.map { _ in false }
+    let dataset = rawItems.lazy.map { (x: Int) -> Tensor<Float> in
+      accessed[x] = true
+      return Tensor<Float>(randomNormal: [224, 224, 3])
+    }
+    
+    // Using `.shuffled()` access all elements
+    let _ = dataset.shuffled()
+    XCTAssert(accessed.reduce(true) { $0 && $1 })
+      
+    // Using `.innerShuffled()` on a `ReindexedColletion` does not access elements
+    accessed = rawItems.map { _ in false }
+    let _ = ReindexedCollection(dataset).innerShuffled()
+    XCTAssert(accessed.reduce(true) { $0 && !$1 })
+  }
+  
+  func testBaseUse() {
    // A heavy-compute function lazily mapped on the raw items (for instance, opening the images)
     let dataSet = rawItems.lazy.map { _ in Tensor<Float>(randomNormal: [224, 224, 3]) }
 
     // A `Batcher` defined on this:
     let batches = Batches(of: 64, from: dataSet, \.collated)
     // Iteration over it (for instance, on epoch of the training loop) 
-    print(batches.map(\.shape))
+    XCTAssert(batches.allSatisfy() { 
+      $0.shape == TensorShape([64, 224, 224, 3]) }
+    )
   }
     
   // Test with shuffle
@@ -134,7 +154,8 @@ final class EpochsTests : XCTestCase {
 
 extension EpochsTests {
   static var allTests = [
-    ("test0", test0),
+    ("testLazyShuffle", testLazyShuffle),
+    ("testBaseUse", testBaseUse),
     ("test1", test1),
     ("test2", test2),
     ("test3", test3),
