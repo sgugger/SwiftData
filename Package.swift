@@ -13,6 +13,7 @@ let package = Package(
   ],
   targets: [
     .target(name: "Batcher", path: "Batcher"),
+    .testTarget(name: "BatcherTest", dependencies: ["Batcher"]),
     //.testTarget(
     //  name: "exampleBatcher",
     //  dependencies: ["Batcher"],
