@@ -14,15 +14,8 @@ let package = Package(
   targets: [
     .target(name: "Batcher", path: "Batcher"),
     .testTarget(name: "BatcherTest", dependencies: ["Batcher"]),
-    //.testTarget(
-    //  name: "exampleBatcher",
-    //  dependencies: ["Batcher"],
-    //  path: "examples", sources: ["exampleBatcher.swift"]),
     .target(name: "Batcher1", path: "Batcher1"),
-    //.testTarget(
-    //  name: "exampleBatcher1",
-    //  dependencies: ["Batcher1"],
-    //  path: "examples", sources: ["exampleBatcher1.swift"]),
+    .testTarget(name: "Batcher1Test", dependencies: ["Batcher1"]),
     .target(name: "Batcher2", path: "Batcher2"),
     .target(name: "Epochs", path: "Epochs")
   ])
