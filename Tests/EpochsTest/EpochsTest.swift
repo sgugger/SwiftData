@@ -69,10 +69,28 @@ final class EpochsTests : XCTestCase {
     }
     return dataSet
   }()
+    
+  func paddingTest(padValue: Int32, padFirst: Bool) {
+    let batches = Batches(of: 64, from: dataSet) { $0.paddedAndCollated(with: padValue) }
+    for (i, b) in batches.enumerated() {
+      let shapes = dataSet[(i * 64)..<((i + 1) * 64)].map { Int($0.shape[0]) }
+      let expectedShape = shapes.reduce(0) { max($0, $1) }
+      XCTAssertEqual(Int(b.shape[1]), expectedShape)
+        
+      for k in 0..<64 {
+        let currentShape = dataSet[i * 64 + k].shape[0]
+        XCTAssertEqual(
+          b[k, currentShape..<expectedShape], 
+          Tensor<Int32>(repeating: padValue, shape: [expectedShape - currentShape]))         
+      }
+    }
+  }
 
-  func test3() {
-    let batches = Batches(of: 64, from: dataSet) { $0.paddedAndCollated(with: 0) }
-    print(batches.map(\.shape))
+  func testAllPadding() {
+    paddingTest(padValue: 0, padFirst: false)
+    paddingTest(padValue: 42, padFirst: false)
+    paddingTest(padValue: 0, padFirst: true)
+    paddingTest(padValue: -1, padFirst: true)
   }
 
   // Use with a sampler
@@ -158,7 +176,7 @@ extension EpochsTests {
     ("testBaseUse", testBaseUse),
     ("test1", test1),
     ("test2", test2),
-    ("test3", test3),
+    ("testAllPadding", testAllPadding),
     ("test4", test4),
     ("test5", test5),
     ("test6", test6),
