@@ -32,33 +32,30 @@ let tfSeed: TensorFlowSeed = (
   graph: Int32.random(in:Int32.min..<Int32.max, using: &pcg), 
   op: Int32.random(in:Int32.min..<Int32.max, using: &pcg))
 
+class Box {
+  var accessed: Bool = false
+}
+
 final class EpochsTests /*: XCTestCase*/ {
   // Some raw items (for instance filenames)
-  let rawItems: [Int] = Array(0..<512)
+  let rawItems: [Box] = Array(0..<512).map{ _ in Box() }
   
   func testLazyShuffle() {
     // A lazy dataset and an array that keeps track of whether the elements were
     // accessed or not.
-    var accessed = rawItems.map { _ in false }
-    accessed.withUnsafeMutableBufferPointer { accessed in
-      let dataset = rawItems.lazy.map { [a = accessed] (x: Int) -> Tensor<Float> in
-        a[x] = true
-        return Tensor<Float>(randomNormal: [224, 224, 3])
-      }
-    
-      // Using `.shuffled()` access all elements
-      let _ = dataset.shuffled(using: &pcg)
-      XCTAssert(accessed.reduce(true) { $0 && $1 })
-
-      
-      // Using `.shuffled()` access all elements
-      let _ = dataset.shuffled(using: &pcg)
-      XCTAssert(accessed.reduce(true) { $0 && $1 })
-      // Using `.innerShuffled()` on a `ReindexedColletion` does not access elements
-      for i in accessed.indices { accessed[i] = false }
-      let _ = ReindexedCollection(dataset).innerShuffled(using: &pcg)
-      XCTAssert(accessed.reduce(true) { $0 && !$1 })
+    let dataset = rawItems.lazy.map { (x: Box) -> Tensor<Float> in
+      x.accessed = true
+      return Tensor<Float>(randomNormal: [224, 224, 3])
     }
+    
+    // Using `.shuffled()` access all elements
+    let _ = dataset.shuffled(using: &pcg)
+    XCTAssert(rawItems.allSatisfy { $0.accessed }) 
+
+    // Using `.innerShuffled()` on a `ReindexedColletion` does not access elements
+    let _ = rawItems.map { $0.accessed = false }
+    let _ = ReindexedCollection(dataset).innerShuffled(using: &pcg)
+    XCTAssert(rawItems.allSatisfy { !$0.accessed }) 
   }
   
   func testBaseUse() {
@@ -68,57 +65,47 @@ final class EpochsTests /*: XCTestCase*/ {
     // A `Batcher` defined on this:
     let batches = Batches(of: 64, from: dataSet, \.collated)
     // Iteration over it (for instance, on epoch of the training loop) 
-    XCTAssert(batches.allSatisfy() { 
+    XCTAssert(batches.allSatisfy { 
       $0.shape == TensorShape([64, 224, 224, 3]) }
     )
   }
     
   // Tests with shuffle
   func testShuffle() {
-    var accessed = rawItems.map { _ in false }
-    accessed.withUnsafeMutableBufferPointer { accessed in
-      // We need to actually go back to the raw collection to shuffle:
-      let dataSet = rawItems.shuffled(using: &pcg).lazy.map { [a = accessed](x: Int) -> Tensor<Float> in
-        a[x] = true
-        return Tensor<Float>(randomNormal: [224, 224, 3], seed: tfSeed)
-      }
+    let dataset = rawItems.shuffled().lazy.map { (x: Box) -> Tensor<Float> in
+      x.accessed = true
+      return Tensor<Float>(randomNormal: [224, 224, 3])
+    }
 
-      let batches = Batches(of: 64, from: dataSet, \.collated)
-      for (i, batch) in batches.enumerated() {
-        XCTAssertEqual(batch.shape, TensorShape([64, 224, 224, 3]))
-        // Test randomness. This test has a probability of 1 over (512 choose 64)
-        // to fail (but that number is bigger than 2^192, so it should be safe) 
-        if i == 0 {
-          XCTAssertFalse(accessed[0..<64].reduce(true) { $0 && $1 })
-        }
-        // All those tests true will mean we accessed every element of the dataset
-        // exactly once
-        XCTAssertEqual(accessed.filter() { $0 == true }.count, (i + 1) * 64)
+    let batches = Batches(of: 64, from: dataset, \.collated)
+    for (i, batch) in batches.enumerated() {
+      XCTAssertEqual(batch.shape, TensorShape([64, 224, 224, 3]))
+      // Test randomness.
+      if i == 0 {
+        XCTAssertFalse(rawItems[0..<64].allSatisfy { $0.accessed })
       }
+      // All those tests true will mean we accessed every element of the dataset
+      // exactly once
+      XCTAssertEqual(rawItems.filter() { $0.accessed }.count, (i + 1) * 64)
     }
   }
   
   func testInnerShuffle() {
-    var accessed = rawItems.map { _ in false }
-    accessed.withUnsafeMutableBufferPointer { accessed in
-      // ReindexCollection can shuffle the base indices for us:
-      let dataSet = rawItems.lazy.map { [a = accessed](x: Int) -> Tensor<Float> in
-        a[x] = true
-        return Tensor<Float>(randomNormal: [224, 224, 3], seed: tfSeed)
-      }
+    let dataset = rawItems.lazy.map { (x: Box) -> Tensor<Float> in
+      x.accessed = true
+      return Tensor<Float>(randomNormal: [224, 224, 3])
+    }
 
-      let batches = Batches(of: 64, from:  ReindexedCollection(dataSet).innerShuffled(using: &pcg), \.collated)
-      for (i, batch) in batches.enumerated() {
-        XCTAssertEqual(batch.shape, TensorShape([64, 224, 224, 3]))
-        // Test randomness. This test has a probability of 1 over (512 choose 64)
-        // to fail (but that number is bigger than 2^192, so it should be safe) 
-        if i == 0 {
-          XCTAssertFalse(accessed[0..<64].reduce(true) { $0 && $1 })
-        }
-        // All those tests true will mean we accessed every element of the dataset
-        // exactly once
-        XCTAssertEqual(accessed.filter() { $0 == true }.count, (i + 1) * 64)
+    let batches = Batches(of: 64, from:  ReindexedCollection(dataset).innerShuffled(using: &pcg), \.collated)
+    for (i, batch) in batches.enumerated() {
+      XCTAssertEqual(batch.shape, TensorShape([64, 224, 224, 3]))
+      // Test randomness.
+      if i == 0 {
+        XCTAssertFalse(rawItems[0..<64].allSatisfy { $0.accessed })
       }
+      // All those tests true will mean we accessed every element of the dataset
+      // exactly once
+      XCTAssertEqual(rawItems.filter() { $0.accessed }.count, (i + 1) * 64)
     }
   }
     
