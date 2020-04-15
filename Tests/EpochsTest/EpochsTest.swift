@@ -72,6 +72,7 @@ final class EpochsTests /*: XCTestCase*/ {
     
   // Tests with shuffle
   func testShuffle() {
+    let _ = rawItems.map { $0.accessed = false }
     let dataset = rawItems.shuffled().lazy.map { (x: Box) -> Tensor<Float> in
       x.accessed = true
       return Tensor<Float>(randomNormal: [224, 224, 3])
@@ -91,6 +92,7 @@ final class EpochsTests /*: XCTestCase*/ {
   }
   
   func testInnerShuffle() {
+    let _ = rawItems.map { $0.accessed = false }
     let dataset = rawItems.lazy.map { (x: Box) -> Tensor<Float> in
       x.accessed = true
       return Tensor<Float>(randomNormal: [224, 224, 3])
