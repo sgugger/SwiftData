@@ -45,6 +45,11 @@ final class EpochsTests /*: XCTestCase*/ {
         a[x] = true
         return Tensor<Float>(randomNormal: [224, 224, 3])
       }
+    
+      // Using `.shuffled()` access all elements
+      let _ = dataset.shuffled(using: &pcg)
+      XCTAssert(accessed.reduce(true) { $0 && $1 })
+
       
       // Using `.shuffled()` access all elements
       let _ = dataset.shuffled(using: &pcg)
@@ -53,7 +58,6 @@ final class EpochsTests /*: XCTestCase*/ {
       for i in accessed.indices { accessed[i] = false }
       let _ = ReindexedCollection(dataset).innerShuffled(using: &pcg)
       XCTAssert(accessed.reduce(true) { $0 && !$1 })
-      
     }
   }
   
