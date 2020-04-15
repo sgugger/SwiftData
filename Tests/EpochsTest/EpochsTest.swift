@@ -37,23 +37,49 @@ final class EpochsTests : XCTestCase {
     )
   }
     
-  // Test with shuffle
-  func test1() {
+  // Tests with shuffle
+  func testShuffle() {
+    var accessed = rawItems.map { _ in false }
     // We need to actually go back to the raw collection to shuffle:
-    let dataSet = rawItems.shuffled().lazy.map { _ -> Tensor<Float> in
+    let dataSet = rawItems.shuffled().lazy.map { (x: Int) -> Tensor<Float> in
+      accessed[x] = true
       return Tensor<Float>(randomNormal: [224, 224, 3])
     }
+
     let batches = Batches(of: 64, from: dataSet, \.collated)
-    print(batches.map(\.shape))
+    for (i, batch) in batches.enumerated() {
+      XCTAssertEqual(batch.shape, TensorShape([64, 224, 224, 3]))
+      // Test randomness. This test has a probability of 1 over (512 choose 64)
+      // to fail (but that number is bigger than 2^192, so it should be safe) 
+      if i == 0 {
+        XCTAssertFalse(accessed[0..<64].reduce(true) { $0 && $1 })
+      }
+      // All those tests true will mean we accessed every element of the dataset
+      // exactly once
+      XCTAssertEqual(accessed.filter() { $0 == true }.count, (i + 1) * 64)
+    }
   }
-    
-  func test2() {
-    // ReindexCollection does that for us
-    let dataSet = rawItems.lazy.map { _ -> Tensor<Float> in
+   
+  func testInnerShuffle() {
+    var accessed = rawItems.map { _ in false }
+    // ReindexCollection can shuffle the base indices for us:
+    let dataSet = rawItems.lazy.map { (x: Int) -> Tensor<Float> in
+      accessed[x] = true
       return Tensor<Float>(randomNormal: [224, 224, 3])
     }
-    let batches = Batches(of: 64, from: ReindexedCollection(dataSet).innerShuffled(), \.collated)
-    print(batches.map(\.shape))
+
+    let batches = Batches(of: 64, from:  ReindexedCollection(dataSet).innerShuffled(), \.collated)
+    for (i, batch) in batches.enumerated() {
+      XCTAssertEqual(batch.shape, TensorShape([64, 224, 224, 3]))
+      // Test randomness. This test has a probability of 1 over (512 choose 64)
+      // to fail (but that number is bigger than 2^192, so it should be safe) 
+      if i == 0 {
+        XCTAssertFalse(accessed[0..<64].reduce(true) { $0 && $1 })
+      }
+      // All those tests true will mean we accessed every element of the dataset
+      // exactly once
+      XCTAssertEqual(accessed.filter() { $0 == true }.count, (i + 1) * 64)
+    }
   }
     
   // Use with padding
@@ -174,8 +200,8 @@ extension EpochsTests {
   static var allTests = [
     ("testLazyShuffle", testLazyShuffle),
     ("testBaseUse", testBaseUse),
-    ("test1", test1),
-    ("test2", test2),
+    ("testShuffle", testShuffle),
+    ("testInnerShuffle", testInnerShuffle),
     ("testAllPadding", testAllPadding),
     ("test4", test4),
     ("test5", test5),
