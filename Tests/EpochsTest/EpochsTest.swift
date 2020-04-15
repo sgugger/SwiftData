@@ -128,17 +128,23 @@ final class EpochsTests : XCTestCase {
     return Array(0..<dataset.count).sorted { dataset[$0].shape[0] > dataset[$1].shape[0] }
   }
 
-  func test4() {
+  func testSortAndPadding() {
     // Use with a sampler
     // In our previous example, another way to be memory efficient is to batch
    // samples of roughly the same lengths.
     let sortedDataset = dataSet.sorted { $0.shape[0] > $1.shape[0] }
       
     let batches = Batches(of: 64, from: sortedDataset) { $0.paddedAndCollated(with: 0) }
-    print(batches.map(\.shape))
+    var previousSize: Int? = nil
+    for batch in batches {
+      if let size = previousSize {
+        XCTAssert(size >= batch.shape[1])
+      }
+      previousSize = Int(batch.shape[1])
+    }
   }
     
-  func test5() {
+  func testSortishAndPadding() {
     // When using a `batchSize` we get a bit of shuffle:
     // This can all be applied on a lazy collection without breaking the lasziness as long as the sort function does not access the dataset
     let sortedDataset = ReindexedCollection(dataSet).innerShuffled().sortedInBatches(of: 256) { 
@@ -146,7 +152,13 @@ final class EpochsTests : XCTestCase {
     }
 
     let batches = Batches(of: 64, from: sortedDataset) { $0.paddedAndCollated(with: 0) }
-    print(batches.map(\.shape))
+    var previousSize: Int? = nil
+    for (i, batch) in batches.enumerated() {
+      if let size = previousSize {
+        XCTAssert(i%4 != 0 ? size >= batch.shape[1] : size <= batch.shape[1])
+      }
+      previousSize = Int(batch.shape[1])
+    }
   }
     
   struct LanguageModelDataset<Texts: RandomAccessCollection>: Collection where Texts.Element == [Int] {
@@ -203,8 +215,8 @@ extension EpochsTests {
     ("testShuffle", testShuffle),
     ("testInnerShuffle", testInnerShuffle),
     ("testAllPadding", testAllPadding),
-    ("test4", test4),
-    ("test5", test5),
+    ("testSortAndPadding", testSortAndPadding),
+    ("testSortishAndPadding", testSortishAndPadding),
     ("test6", test6),
     ("test7", test7),
   ]
