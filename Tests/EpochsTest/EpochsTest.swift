@@ -1,33 +1,9 @@
 import TensorFlow
-//import Epochs
-//import XCTest
+import Epochs
+import XCTest
+import PcgRandom
 
-func XCTAssert(
-  _ expression: @autoclosure () -> Bool,
-  _ message: @autoclosure () -> String = "",
-  file: StaticString = #file, line: UInt = #line
-) {
-  assert(expression(), message(), file: file, line: line)
-}
-
-func XCTAssertFalse(
-  _ expression: @autoclosure () -> Bool,
-  _ message: @autoclosure () -> String = "",
-  file: StaticString = #file, line: UInt = #line
-) {
-  assert(!expression(), message(), file: file, line: line)
-}
-
-func XCTAssertEqual<T: Equatable>(
-  _ expression: @autoclosure () -> T,
-  _ expression1: @autoclosure () -> T,
-  _ message: @autoclosure () -> String = "",
-  file: StaticString = #file, line: UInt = #line
-) {
-  assert(expression() == expression1(), message(), file: file, line: line)
-}
-
-var pcg = LinearCongruential(seed: 42)
+var pcg = Pcg64Random(seed: 42)
 let tfSeed: TensorFlowSeed = (
   graph: Int32.random(in:Int32.min..<Int32.max, using: &pcg), 
   op: Int32.random(in:Int32.min..<Int32.max, using: &pcg))
@@ -36,7 +12,7 @@ class Box {
   var accessed: Bool = false
 }
 
-final class EpochsTests /*: XCTestCase*/ {
+final class EpochsTests: XCTestCase {
   // Some raw items (for instance filenames)
   let rawItems: [Box] = Array(0..<512).map{ _ in Box() }
   
