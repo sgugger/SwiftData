@@ -11,13 +11,16 @@ let package = Package(
     .library(name: "Batcher2", targets: ["Batcher2"]),
     .library(name: "Epochs", targets: ["Epochs"])
   ],
+  dependencies: [
+    .package(name: "PcgRandom", url: "https://github.com/paiv/swift-pcg-random.git", .upToNextMajor(from: "1.0.0"))
+  ],
   targets: [
     .target(name: "Batcher", path: "Batcher"),
-    .testTarget(name: "BatcherTest", dependencies: ["Batcher"]),
+    //.testTarget(name: "BatcherTest", dependencies: ["Batcher"]),
     .target(name: "Batcher1", path: "Batcher1"),
-    .testTarget(name: "Batcher1Test", dependencies: ["Batcher1"]),
+    //.testTarget(name: "Batcher1Test", dependencies: ["Batcher1"]),
     .target(name: "Batcher2", path: "Batcher2"),
-    .testTarget(name: "Batcher2Test", dependencies: ["Batcher2"]),
+    //.testTarget(name: "Batcher2Test", dependencies: ["Batcher2"]),
     .target(name: "Epochs", path: "Epochs"),
-    .testTarget(name: "EpochsTest", dependencies: ["Epochs"]),
+    .testTarget(name: "EpochsTest", dependencies: ["Epochs", "PcgRandom"]),
   ])

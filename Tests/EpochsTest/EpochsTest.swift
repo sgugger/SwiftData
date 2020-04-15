@@ -1,6 +1,12 @@
 import TensorFlow
 import Epochs
 import XCTest
+import PcgRandom
+
+var pcg = Pcg64Random(seed: 42)
+let tfSeed: TensorFlowSeed = (
+  graph: Int32.random(in:Int32.min..<Int32.max, using: &pcg), 
+  op: Int32.random(in:Int32.min..<Int32.max, using: &pcg))
 
 final class EpochsTests : XCTestCase {
   // Some raw items (for instance filenames)
@@ -16,18 +22,18 @@ final class EpochsTests : XCTestCase {
     }
     
     // Using `.shuffled()` access all elements
-    let _ = dataset.shuffled()
+    let _ = dataset.shuffled(using: &pcg)
     XCTAssert(accessed.reduce(true) { $0 && $1 })
       
     // Using `.innerShuffled()` on a `ReindexedColletion` does not access elements
     accessed = rawItems.map { _ in false }
-    let _ = ReindexedCollection(dataset).innerShuffled()
+    let _ = ReindexedCollection(dataset).innerShuffled(using: &pcg)
     XCTAssert(accessed.reduce(true) { $0 && !$1 })
   }
   
   func testBaseUse() {
    // A heavy-compute function lazily mapped on the raw items (for instance, opening the images)
-    let dataSet = rawItems.lazy.map { _ in Tensor<Float>(randomNormal: [224, 224, 3]) }
+    let dataSet = rawItems.lazy.map { _ in Tensor<Float>(randomNormal: [224, 224, 3], seed: tfSeed) }
 
     // A `Batcher` defined on this:
     let batches = Batches(of: 64, from: dataSet, \.collated)
@@ -41,9 +47,9 @@ final class EpochsTests : XCTestCase {
   func testShuffle() {
     var accessed = rawItems.map { _ in false }
     // We need to actually go back to the raw collection to shuffle:
-    let dataSet = rawItems.shuffled().lazy.map { (x: Int) -> Tensor<Float> in
+    let dataSet = rawItems.shuffled(using: &pcg).lazy.map { (x: Int) -> Tensor<Float> in
       accessed[x] = true
-      return Tensor<Float>(randomNormal: [224, 224, 3])
+      return Tensor<Float>(randomNormal: [224, 224, 3], seed: tfSeed)
     }
 
     let batches = Batches(of: 64, from: dataSet, \.collated)
@@ -65,10 +71,10 @@ final class EpochsTests : XCTestCase {
     // ReindexCollection can shuffle the base indices for us:
     let dataSet = rawItems.lazy.map { (x: Int) -> Tensor<Float> in
       accessed[x] = true
-      return Tensor<Float>(randomNormal: [224, 224, 3])
+      return Tensor<Float>(randomNormal: [224, 224, 3], seed: tfSeed)
     }
 
-    let batches = Batches(of: 64, from:  ReindexedCollection(dataSet).innerShuffled(), \.collated)
+    let batches = Batches(of: 64, from:  ReindexedCollection(dataSet).innerShuffled(using: &pcg), \.collated)
     for (i, batch) in batches.enumerated() {
       XCTAssertEqual(batch.shape, TensorShape([64, 224, 224, 3]))
       // Test randomness. This test has a probability of 1 over (512 choose 64)
@@ -88,9 +94,10 @@ final class EpochsTests : XCTestCase {
     var dataSet: [Tensor<Int32>] = []
     for _ in 0..<512 {
       dataSet.append(Tensor<Int32>(
-                       randomUniform: [Int.random(in: 1...200)], 
+                       randomUniform: [Int.random(in: 1...200, using: &pcg)], 
                        lowerBound: Tensor<Int32>(0), 
-                       upperBound: Tensor<Int32>(100)
+                       upperBound: Tensor<Int32>(100),
+                       seed: tfSeed
                     ))
     }
     return dataSet
@@ -122,12 +129,6 @@ final class EpochsTests : XCTestCase {
   // Use with a sampler
   // In our previous example, another way to be memory efficient is to batch
   // samples of roughly the same lengths.
-  func sortSamples(on dataset: inout [Tensor<Int32>], shuffled: Bool) -> [Int] {
-    // Just giving a quick example, but the function should shuffle a bit the sorted thing
-    // if shuffle=true
-    return Array(0..<dataset.count).sorted { dataset[$0].shape[0] > dataset[$1].shape[0] }
-  }
-
   func testSortAndPadding() {
     // Use with a sampler
     // In our previous example, another way to be memory efficient is to batch
@@ -147,7 +148,7 @@ final class EpochsTests : XCTestCase {
   func testSortishAndPadding() {
     // When using a `batchSize` we get a bit of shuffle:
     // This can all be applied on a lazy collection without breaking the lasziness as long as the sort function does not access the dataset
-    let sortedDataset = ReindexedCollection(dataSet).innerShuffled().sortedInBatches(of: 256) { 
+    let sortedDataset = ReindexedCollection(dataSet).innerShuffled(using: &pcg).sortedInBatches(of: 256) { 
       dataSet[$0].shape[0] > dataSet[$1].shape[0] 
     }
 
@@ -213,7 +214,7 @@ final class EpochsTests : XCTestCase {
   func testLanguageModelShuffled() {
     // To shuffle it we need to go back to the inner numbers
     let numbers: [[Int]] = [[1,2,3,4,5], [6,7,8], [9,10,11,12,13,14,15], [16,17,18]]
-    let languageDataset = LanguageModelDataset(texts: numbers.shuffled(), sequenceLength: 3)
+    let languageDataset = LanguageModelDataset(texts: numbers.shuffled(using: &pcg), sequenceLength: 3)
     let batches = Batches(of: 3, from: languageDataset, \.collated)
     
     var stream: [Int] = []

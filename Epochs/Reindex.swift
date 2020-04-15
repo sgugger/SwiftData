@@ -62,6 +62,12 @@ public extension ReindexedCollection {
     return ReindexedCollection(
       base, reindex: (reindex ?? Array(base.indices)).shuffled())
   }
+  
+  /// Returns an instance of self with `reindex` shuffled with `rng`.
+  func innerShuffled<T>(using generator: inout T) -> Self where T : RandomNumberGenerator {
+    return ReindexedCollection(
+      base, reindex: (reindex ?? Array(base.indices)).shuffled(using: &generator))
+  }
  
   /// Sorts itself in batches
   mutating func sortInBatches(
