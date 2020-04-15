@@ -18,7 +18,7 @@ final class EpochsTests : XCTestCase {
     var accessed = rawItems.map { _ in false }
     let dataset = rawItems.lazy.map { (x: Int) -> Tensor<Float> in
       accessed[x] = true
-      return Tensor<Float>(randomNormal: [224, 224, 3])
+      return Tensor<Float>(randomNormal: [224, 224, 3], seed: tfSeed)
     }
     
     // Using `.shuffled()` access all elements
