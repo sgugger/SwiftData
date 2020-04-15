@@ -191,19 +191,39 @@ final class EpochsTests : XCTestCase {
   }
     
   //Now let's look at what it gives us:
-  func test6() {
+  func testLanguageModel() {
     let numbers: [[Int]] = [[1,2,3,4,5], [6,7,8], [9,10,11,12,13,14,15], [16,17,18]]
     let languageDataset = LanguageModelDataset(texts: numbers, sequenceLength: 3)
     let batches = Batches(of: 3, from: languageDataset, \.collated)
-    print(batches.map(\.shape))
+    for (i, batch) in batches.enumerated() {
+      let expected = Tensor<Int32>(rangeFrom: Int32(1 + i * 9), to: Int32(1 + (i + 1) * 9), stride: 1)
+      XCTAssertEqual(batch, expected.reshaped(to: [3, 3]))
+    }
+  }
+  
+  func isSubset(_ x: [Int], from y: [Int]) -> Bool {
+    if let i = y.firstIndex(of: x[0]) {
+      return x.enumerated().allSatisfy() { (k: Int, o: Int) -> Bool in
+        o == y[i + k]
+      }  
+    }
+    return false
   }
 
-  func test7() {
+  func testLanguageModelShuffled() {
     // To shuffle it we need to go back to the inner numbers
     let numbers: [[Int]] = [[1,2,3,4,5], [6,7,8], [9,10,11,12,13,14,15], [16,17,18]]
     let languageDataset = LanguageModelDataset(texts: numbers.shuffled(), sequenceLength: 3)
     let batches = Batches(of: 3, from: languageDataset, \.collated)
-    print(batches.map(\.shape))
+    
+    var stream: [Int] = []
+    for batch in batches {
+      stream += batch.scalars.map { Int($0) }
+    }
+      
+    // This checks the stream contains all texts once.
+    XCTAssertEqual(stream.count, 18)
+    XCTAssert(numbers.allSatisfy{ isSubset($0, from: stream) })
   }
 }
 
@@ -217,7 +237,7 @@ extension EpochsTests {
     ("testAllPadding", testAllPadding),
     ("testSortAndPadding", testSortAndPadding),
     ("testSortishAndPadding", testSortishAndPadding),
-    ("test6", test6),
-    ("test7", test7),
+    ("testLanguageModel", testLanguageModel),
+    ("testLanguageModelShuffled", testLanguageModelShuffled),
   ]
 }
