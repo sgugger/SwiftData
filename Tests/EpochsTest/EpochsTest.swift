@@ -15,7 +15,7 @@ class Tracker {
 let rawItems: [Tracker] = Array(0..<512).map{ _ in Tracker() }
 // A dataset that applies a lazy transformation on those raw items (think
 // opening an image
-let dataset = rawItems.shuffled().lazy.map { (x: Tracker) -> Tensor<Float> in
+let dataset = rawItems.lazy.map { (x: Tracker) -> Tensor<Float> in
   x.accessed = true
   return Tensor<Float>(randomNormal: [224, 224, 3])
 }
@@ -52,9 +52,8 @@ final class EpochsTests: XCTestCase {
     
   // Tests with shuffle
   func testShuffle() {
-    var trainingEpochs = UniformTrainingEpochs(samples: dataset, batchSize: 64, 
+    let trainingEpochs = UniformTrainingEpochs(samples: dataset, batchSize: 64, 
                                                entropy: pcg)
-
     var accessed = Array(0..<512)
     for batches in trainingEpochs.prefix(20) {
       resetRawItems()
