@@ -8,82 +8,71 @@ let tfSeed: TensorFlowSeed = (
   graph: Int32.random(in:Int32.min..<Int32.max, using: &pcg), 
   op: Int32.random(in:Int32.min..<Int32.max, using: &pcg))
 
-class Box {
+class Tracker {
   var accessed: Bool = false
 }
 
+let rawItems: [Tracker] = Array(0..<512).map{ _ in Tracker() }
+// A dataset that applies a lazy transformation on those raw items (think
+// opening an image
+let dataset = rawItems.shuffled().lazy.map { (x: Tracker) -> Tensor<Float> in
+  x.accessed = true
+  return Tensor<Float>(randomNormal: [224, 224, 3])
+}
+
 final class EpochsTests: XCTestCase {
-  // Some raw items (for instance filenames)
-  let rawItems: [Box] = Array(0..<512).map{ _ in Box() }
+  func resetRawItems() {
+    let _ = rawItems.map { $0.accessed = false }
+  }
   
   func testLazyShuffle() {
-    // A lazy dataset and an array that keeps track of whether the elements were
-    // accessed or not.
-    let dataset = rawItems.lazy.map { (x: Box) -> Tensor<Float> in
-      x.accessed = true
-      return Tensor<Float>(randomNormal: [224, 224, 3])
-    }
-    
     // Using `.shuffled()` access all elements
     let _ = dataset.shuffled(using: &pcg)
     XCTAssert(rawItems.allSatisfy { $0.accessed }) 
 
     // Using `.innerShuffled()` on a `ReindexedColletion` does not access elements
-    let _ = rawItems.map { $0.accessed = false }
+    resetRawItems()
     let _ = ReindexedCollection(dataset).innerShuffled(using: &pcg)
     XCTAssert(rawItems.allSatisfy { !$0.accessed }) 
   }
   
   func testBaseUse() {
-   // A heavy-compute function lazily mapped on the raw items (for instance, opening the images)
-    let dataSet = rawItems.lazy.map { _ in Tensor<Float>(randomNormal: [224, 224, 3], seed: tfSeed) }
-
-    // A `Batcher` defined on this:
-    let batches = Batches(of: 64, from: dataSet, \.collated)
-    // Iteration over it (for instance, on epoch of the training loop) 
-    XCTAssert(batches.allSatisfy { 
-      $0.shape == TensorShape([64, 224, 224, 3]) }
-    )
+    // `inBatches` splits our dataset in batches, the `collated` property is
+    // defined for any struct conforming to `Collatable`
+    let batches = dataset.inBatches(of: 64).lazy.map(\.collated)
+    
+    resetRawItems()
+    for (i, batch) in batches.enumerated() {
+      XCTAssertEqual(batch.shape, TensorShape([64, 224, 224, 3]))
+      let limit = (i + 1) * 64
+      XCTAssert(rawItems[..<limit].allSatisfy(\.accessed))
+      XCTAssert(rawItems[limit...].allSatisfy( {!$0.accessed }))
+    }
   }
     
   // Tests with shuffle
   func testShuffle() {
-    let _ = rawItems.map { $0.accessed = false }
-    let dataset = rawItems.shuffled().lazy.map { (x: Box) -> Tensor<Float> in
-      x.accessed = true
-      return Tensor<Float>(randomNormal: [224, 224, 3])
-    }
+    var trainingEpochs = UniformTrainingEpochs(samples: dataset, batchSize: 64, 
+                                               entropy: pcg)
 
-    let batches = Batches(of: 64, from: dataset, \.collated)
-    for (i, batch) in batches.enumerated() {
-      XCTAssertEqual(batch.shape, TensorShape([64, 224, 224, 3]))
-      // Test randomness.
-      if i == 0 {
-        XCTAssertFalse(rawItems[0..<64].allSatisfy { $0.accessed })
+    var accessed = Array(0..<512)
+    for batches in trainingEpochs.prefix(20) {
+      resetRawItems()
+      var newAccessed: [Int] = []
+      for batch in batches {
+        let collatedBatch = batch.collated
+        XCTAssertEqual(collatedBatch.shape, TensorShape([64, 224, 224, 3]))
+          
+        newAccessed += Array(0..<512).filter { rawItems[$0].accessed }    
       }
-      // All those tests true will mean we accessed every element of the dataset
-      // exactly once
-      XCTAssertEqual(rawItems.filter() { $0.accessed }.count, (i + 1) * 64)
-    }
-  }
-  
-  func testInnerShuffle() {
-    let _ = rawItems.map { $0.accessed = false }
-    let dataset = rawItems.lazy.map { (x: Box) -> Tensor<Float> in
-      x.accessed = true
-      return Tensor<Float>(randomNormal: [224, 224, 3])
-    }
-
-    let batches = Batches(of: 64, from:  ReindexedCollection(dataset).innerShuffled(using: &pcg), \.collated)
-    for (i, batch) in batches.enumerated() {
-      XCTAssertEqual(batch.shape, TensorShape([64, 224, 224, 3]))
-      // Test randomness.
-      if i == 0 {
-        XCTAssertFalse(rawItems[0..<64].allSatisfy { $0.accessed })
-      }
-      // All those tests true will mean we accessed every element of the dataset
-      // exactly once
-      XCTAssertEqual(rawItems.filter() { $0.accessed }.count, (i + 1) * 64)
+      XCTAssertNotEqual(accessed, newAccessed, 
+                       "Dataset should have been reshuffled.")
+      
+      accessed = newAccessed
+      let uniqueSamples = Set(accessed)
+      XCTAssertEqual(
+        uniqueSamples.count, rawItems.count,
+        "Every epoch sample should be drawn from a different input sample.")
     }
   }
     
@@ -281,12 +270,12 @@ extension EpochsTests {
     ("testLazyShuffle", testLazyShuffle),
     ("testBaseUse", testBaseUse),
     ("testShuffle", testShuffle),
-    ("testInnerShuffle", testInnerShuffle),
     ("testAllPadding", testAllPadding),
     ("testSortAndPadding", testSortAndPadding),
     ("testSortishAndPadding", testSortishAndPadding),
     ("testLanguageModel", testLanguageModel),
     ("testLanguageModelShuffled", testLanguageModelShuffled),
+    ("testNonuniformTrainingEpochs", testNonuniformTrainingEpochs),
   ]
 }
 
