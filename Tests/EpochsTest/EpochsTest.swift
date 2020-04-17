@@ -3,39 +3,32 @@ import Epochs
 import XCTest
 import PcgRandom
 
+// Seeds for reproducibility
 var pcg = Pcg64Random(seed: 42)
 let tfSeed: TensorFlowSeed = (
   graph: Int32.random(in:Int32.min..<Int32.max, using: &pcg), 
   op: Int32.random(in:Int32.min..<Int32.max, using: &pcg))
 
-class Tracker {
-  var accessed: Bool = false
-}
-
-let rawItems: [Tracker] = Array(0..<512).map{ _ in Tracker() }
-// A dataset that applies a lazy transformation on those raw items (think
-// opening an image
-let dataset = rawItems.lazy.map { (x: Tracker) -> Tensor<Float> in
-  x.accessed = true
-  return Tensor<Float>(randomNormal: [224, 224, 3])
-}
-
 final class EpochsTests: XCTestCase {
+  // A mock item type that tracks if it was accessed or not
+  class Tracker {
+    var accessed: Bool = false
+  }
+
+  let rawItems: [Tracker] = Array(0..<512).map{ _ in Tracker() }  
+   
   func resetRawItems() {
     let _ = rawItems.map { $0.accessed = false }
   }
-  
-  func testLazyShuffle() {
-    // Using `.shuffled()` access all elements
-    let _ = dataset.shuffled(using: &pcg)
-    XCTAssert(rawItems.allSatisfy { $0.accessed }) 
-
-    // Using `.innerShuffled()` on a `ReindexedColletion` does not access elements
-    resetRawItems()
-    let _ = ReindexedCollection(dataset).innerShuffled(using: &pcg)
-    XCTAssert(rawItems.allSatisfy { !$0.accessed }) 
+   
+  // A dataset that applies a lazy transformation on those raw items (think
+  // opening an image
+  var dataset: LazyMapSequence<[Tracker], Tensor<Float>> { 
+    return rawItems.lazy.map { (x: Tracker) -> Tensor<Float> in
+      x.accessed = true
+      return Tensor<Float>(randomNormal: [224, 224, 3]) }
   }
-  
+ 
   func testBaseUse() {
     // `inBatches` splits our dataset in batches, the `collated` property is
     // defined for any struct conforming to `Collatable`
@@ -52,10 +45,13 @@ final class EpochsTests: XCTestCase {
     
   // Tests with shuffle
   func testShuffle() {
-    let trainingEpochs = UniformTrainingEpochs(samples: dataset, batchSize: 64, 
-                                               entropy: pcg)
+    // Using `dataset.shuffled()` would break the laziness. Plus we would need
+    // to do it at each new epoch. `UniformTrainingEpochs` automatically handles
+    // shuffling (and re-shuffling at each epoch) without breaking the laziness.
+    let epochs = UniformTrainingEpochs(samples: dataset, batchSize: 64, 
+                                       entropy: pcg)
     var accessed = Array(0..<512)
-    for batches in trainingEpochs.prefix(20) {
+    for batches in epochs.prefix(20) {
       resetRawItems()
       var newAccessed: [Int] = []
       for batch in batches {
@@ -266,7 +262,6 @@ final class EpochsTests: XCTestCase {
 
 extension EpochsTests {
   static var allTests = [
-    ("testLazyShuffle", testLazyShuffle),
     ("testBaseUse", testBaseUse),
     ("testShuffle", testShuffle),
     ("testAllPadding", testAllPadding),
