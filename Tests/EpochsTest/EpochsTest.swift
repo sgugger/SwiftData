@@ -225,8 +225,56 @@ final class EpochsTests: XCTestCase {
     XCTAssertEqual(stream.count, 18)
     XCTAssert(numbers.allSatisfy{ isSubset($0, from: stream) })
   }
-}
 
+  func testNonuniformTrainingEpochs() {
+    class Sample {
+      init(size: Int) { self.size = size }
+      var size: Int
+    }
+
+    let sampleCount = 503
+    let batchSize = 7
+    let samples = (0..<sampleCount).map {
+      _ in Sample.init(size: Int.random(in: 0..<1000, using: &pcg))
+    }
+    // TODO: More thorough testing.
+
+    let epochs = NonuniformTrainingEpochs(
+      samples: samples,
+      batchSize: batchSize,
+      entropy: pcg) { $0.size < $1.size }
+
+    // The first sample ordering observed during this test.
+    var observedSampleOrder: [ObjectIdentifier]?
+
+    for batches in epochs.prefix(20) {
+      XCTAssertEqual(batches.count, sampleCount / batchSize)
+      XCTAssert(batches.allSatisfy { $0.count == batchSize })
+      let epochSamples = batches.joined()
+      let epochSampleOrder = epochSamples.lazy.map(ObjectIdentifier.init)
+
+      if let o = observedSampleOrder {
+        XCTAssertFalse(
+          o.elementsEqual(epochSampleOrder),
+          "Batches should be randomized")
+      }
+      else {
+        observedSampleOrder = Array(epochSampleOrder)
+      }
+
+      let maxEpochSampleSize = epochSamples.lazy.map(\.size).max()!
+      XCTAssertEqual(
+        batches.first!.lazy.map(\.size).max(),
+        maxEpochSampleSize,
+        "The first batch should contain a sample of maximal size.")
+
+      let uniqueSamples = Set(epochSampleOrder)
+      XCTAssertEqual(
+        uniqueSamples.count, epochSamples.count,
+        "Every epoch sample should be drawn from a different input sample.")
+    }
+  }
+}
 
 extension EpochsTests {
   static var allTests = [
