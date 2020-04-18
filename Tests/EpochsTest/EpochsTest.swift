@@ -51,10 +51,11 @@ final class EpochsTests: XCTestCase {
     let epochs = UniformTrainingEpochs(samples: dataset, batchSize: 64, 
                                        entropy: pcg)
     var accessed = Array(0..<512)
-    for batches in epochs.prefix(20) {
+    for batches in epochs.prefix(10) {
       resetRawItems()
       var newAccessed: [Int] = []
       for batch in batches {
+        XCTAssertEqual(batches.count, 8)
         let collatedBatch = batch.collated
         XCTAssertEqual(collatedBatch.shape, TensorShape([64, 224, 224, 3]))
           
@@ -71,30 +72,61 @@ final class EpochsTests: XCTestCase {
     }
   }
     
+  // Tests with shuffle
+  func testRemainderDropped() {
+    // `UniformTrainingEpochs` automatically drops the remainder batch if it has
+    // less than `batchSize` elements.
+    let epochs = UniformTrainingEpochs(samples: dataset[..<500], batchSize: 64, 
+                                       entropy: pcg)
+    let samplesCount = 500 - 500 % 64
+    var accessed = Array(0..<samplesCount)
+    for batches in epochs.prefix(2) {
+      XCTAssertEqual(batches.count, 7)
+      resetRawItems()
+      var newAccessed: [Int] = []
+      for batch in batches {
+        let collatedBatch = batch.collated
+        XCTAssertEqual(collatedBatch.shape, TensorShape([64, 224, 224, 3]))
+          
+        newAccessed += Array(0..<512).filter { rawItems[$0].accessed }    
+      }
+      XCTAssertNotEqual(accessed, newAccessed, 
+                       "Dataset should have been reshuffled.")
+      
+      accessed = newAccessed
+      let uniqueSamples = Set(accessed)
+      XCTAssertEqual(
+        uniqueSamples.count, samplesCount,
+        "Every epoch sample should be drawn from a different input sample.")
+    }
+  }
+    
   // Use with padding
   // Let's create an array of things of various lengths (for instance texts)
-  let dataSet: [Tensor<Int32>] = { 
-    var dataSet: [Tensor<Int32>] = []
+  let nonuniformDataset: [Tensor<Int32>] = { 
+    var dataset: [Tensor<Int32>] = []
     for _ in 0..<512 {
-      dataSet.append(Tensor<Int32>(
+      dataset.append(Tensor<Int32>(
                        randomUniform: [Int.random(in: 1...200, using: &pcg)], 
                        lowerBound: Tensor<Int32>(0), 
                        upperBound: Tensor<Int32>(100),
                        seed: tfSeed
                     ))
     }
-    return dataSet
+    return dataset
   }()
     
   func paddingTest(padValue: Int32, padFirst: Bool) {
-    let batches = Batches(of: 64, from: dataSet) { $0.paddedAndCollated(with: padValue) }
+    let batches = nonuniformDataset.inBatches(of: 64)
+      .lazy.map { $0.paddedAndCollated(with: padValue) }
     for (i, b) in batches.enumerated() {
-      let shapes = dataSet[(i * 64)..<((i + 1) * 64)].map { Int($0.shape[0]) }
+      let shapes = nonuniformDataset[(i * 64)..<((i + 1) * 64)]
+        .map { Int($0.shape[0]) }
       let expectedShape = shapes.reduce(0) { max($0, $1) }
       XCTAssertEqual(Int(b.shape[1]), expectedShape)
         
       for k in 0..<64 {
-        let currentShape = dataSet[i * 64 + k].shape[0]
+        let currentShape = nonuniformDataset[i * 64 + k].shape[0]
         XCTAssertEqual(
           b[k, currentShape..<expectedShape], 
           Tensor<Int32>(repeating: padValue, shape: [expectedShape - currentShape]))         
@@ -116,7 +148,7 @@ final class EpochsTests: XCTestCase {
     // Use with a sampler
     // In our previous example, another way to be memory efficient is to batch
    // samples of roughly the same lengths.
-    let sortedDataset = dataSet.sorted { $0.shape[0] > $1.shape[0] }
+    let sortedDataset = nonuniformDataset.sorted { $0.shape[0] > $1.shape[0] }
       
     let batches = Batches(of: 64, from: sortedDataset) { $0.paddedAndCollated(with: 0) }
     var previousSize: Int? = nil
@@ -131,9 +163,10 @@ final class EpochsTests: XCTestCase {
   func testSortishAndPadding() {
     // When using a `batchSize` we get a bit of shuffle:
     // This can all be applied on a lazy collection without breaking the lasziness as long as the sort function does not access the dataset
-    let sortedDataset = ReindexedCollection(dataSet).innerShuffled(using: &pcg).sortedInBatches(of: 256) { 
-      dataSet[$0].shape[0] > dataSet[$1].shape[0] 
-    }
+    let sortedDataset = ReindexedCollection(nonuniformDataset)
+      .innerShuffled(using: &pcg).sortedInBatches(of: 256) { 
+        nonuniformDataset[$0].shape[0] > nonuniformDataset[$1].shape[0] 
+      }
 
     let batches = Batches(of: 64, from: sortedDataset) { $0.paddedAndCollated(with: 0) }
     var previousSize: Int? = nil
@@ -264,6 +297,7 @@ extension EpochsTests {
   static var allTests = [
     ("testBaseUse", testBaseUse),
     ("testShuffle", testShuffle),
+    ("testRemainderDropped", testRemainderDropped),
     ("testAllPadding", testAllPadding),
     ("testSortAndPadding", testSortAndPadding),
     ("testSortishAndPadding", testSortishAndPadding),
