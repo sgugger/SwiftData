@@ -160,62 +160,39 @@ final class EpochsTests: XCTestCase {
     }
   }
     
-  func testSortishAndPadding() {
-    // When using a `batchSize` we get a bit of shuffle:
-    // This can all be applied on a lazy collection without breaking the lasziness as long as the sort function does not access the dataset
-    let sortedDataset = ReindexedCollection(nonuniformDataset)
-      .innerShuffled(using: &pcg).sortedInBatches(of: 256) { 
-        nonuniformDataset[$0].shape[0] > nonuniformDataset[$1].shape[0] 
-      }
-
-    let batches = Batches(of: 64, from: sortedDataset) { $0.paddedAndCollated(with: 0) }
-    var previousSize: Int? = nil
-    for (i, batch) in batches.enumerated() {
-      if let size = previousSize {
-        XCTAssert(i%4 != 0 ? size >= batch.shape[1] : size <= batch.shape[1])
-      }
-      previousSize = Int(batch.shape[1])
-    }
-  }
-    
-  struct LanguageModelDataset<Texts: RandomAccessCollection>: Collection where Texts.Element == [Int] {
-    /// The underlying collection of texts
-    public var texts: Texts
-    /// The length of the samples returned when indexing
-    private let sequenceLength: Int
-    // The texts all concatenated together
-    private var stream: [Int]
-    
-    init(texts: Texts, sequenceLength: Int) {
-      self.texts = texts
-      self.sequenceLength = sequenceLength
-      stream = texts.reduce([], +)
-    }
-    
-    public typealias Index = Int
-    public typealias Element = Tensor<Int32>
-    
-    public var startIndex: Int { return 0 }
-    public var endIndex: Int { return stream.count / sequenceLength }
-    public func index(after i: Int) -> Int { i+1 }
-    
-    public subscript(index: Int) -> Tensor<Int32> {
-      get { 
-        let i = index * sequenceLength
-        return Tensor<Int32>(stream[i..<i+sequenceLength].map { Int32($0)} )
-      }
+  let cuts = [0, 5, 8, 15, 24, 30]
+  var texts: [[Int]] { (0..<5).map { Array(cuts[$0]..<cuts[$0+1]) }}
+  
+  // To reindex the dataset such that the first batch samples are given by
+  // indices (0, batchCount, batchCount * 2, ...
+  func preBatchTranspose<C: Collection>(_ base: C, for batchSize: Int) 
+  -> [C.Index] {
+    let batchCount = base.count / batchSize
+    return (0..<base.count).map { (i: Int) -> C.Index in 
+      let j = batchCount * (i % batchSize) + i / batchSize 
+      return base.index(base.startIndex, offsetBy: j) 
     }
   }
     
   //Now let's look at what it gives us:
   func testLanguageModel() {
-    let numbers: [[Int]] = [[1,2,3,4,5], [6,7,8], [9,10,11,12,13,14,15], [16,17,18]]
-    let languageDataset = LanguageModelDataset(texts: numbers, sequenceLength: 3)
-    let batches = Batches(of: 3, from: languageDataset, \.collated)
-    for (i, batch) in batches.enumerated() {
-      let expected = Tensor<Int32>(rangeFrom: Int32(1 + i * 9), to: Int32(1 + (i + 1) * 9), stride: 1)
-      XCTAssertEqual(batch, expected.reshaped(to: [3, 3]))
+    let sequenceLength = 3
+    let batchSize = 2
+
+    let sequences = texts.joined()
+      .inBatches(of: sequenceLength)
+    let indices = preBatchTranspose(sequences, for: batchSize)
+    let batches = sequences.selecting(indices).inBatches(of: batchSize)
+      
+    var results: [[Int32]] = [[], []]
+    for batch in batches { 
+      let tensor = Tensor<Int32>(batch.map { Tensor<Int32>(
+        $0.map { Int32($0) })})
+      XCTAssertEqual(tensor.shape, TensorShape([2, 3]))
+      results[0] += tensor[0].scalars
+      results[1] += tensor[1].scalars
     }
+    XCTAssertEqual(results[0] + results[1], (0..<30).map { Int32($0) })
   }
   
   func isSubset(_ x: [Int], from y: [Int]) -> Bool {
@@ -226,21 +203,27 @@ final class EpochsTests: XCTestCase {
     }
     return false
   }
-
-  func testLanguageModelShuffled() {
-    // To shuffle it we need to go back to the inner numbers
-    let numbers: [[Int]] = [[1,2,3,4,5], [6,7,8], [9,10,11,12,13,14,15], [16,17,18]]
-    let languageDataset = LanguageModelDataset(texts: numbers.shuffled(using: &pcg), sequenceLength: 3)
-    let batches = Batches(of: 3, from: languageDataset, \.collated)
     
-    var stream: [Int] = []
-    for batch in batches {
-      stream += batch.scalars.map { Int($0) }
-    }
+  func testLanguageModelShuffled() {
+    let sequenceLength = 3
+    let batchSize = 2
+
+    let sequences = texts.shuffled().joined()
+      .inBatches(of: sequenceLength)
+    let indices = preBatchTranspose(sequences, for: batchSize)
+    let batches = sequences.selecting(indices).inBatches(of: batchSize)
       
-    // This checks the stream contains all texts once.
-    XCTAssertEqual(stream.count, 18)
-    XCTAssert(numbers.allSatisfy{ isSubset($0, from: stream) })
+    var results: [[Int32]] = [[], []]
+    for batch in batches { 
+      let tensor = Tensor<Int32>(batch.map { Tensor<Int32>(
+        $0.map { Int32($0) })})
+      XCTAssertEqual(tensor.shape, TensorShape([2, 3]))
+      results[0] += tensor[0].scalars
+      results[1] += tensor[1].scalars
+    }
+    let stream = (results[0] + results[1]).map { Int($0) }
+    XCTAssertEqual(stream.count, 30)
+    XCTAssert(texts.allSatisfy{ isSubset($0, from: stream) })
   }
 
   func testNonuniformTrainingEpochs() {
@@ -300,7 +283,6 @@ extension EpochsTests {
     ("testRemainderDropped", testRemainderDropped),
     ("testAllPadding", testAllPadding),
     ("testSortAndPadding", testSortAndPadding),
-    ("testSortishAndPadding", testSortishAndPadding),
     ("testLanguageModel", testLanguageModel),
     ("testLanguageModelShuffled", testLanguageModelShuffled),
     ("testNonuniformTrainingEpochs", testNonuniformTrainingEpochs),
