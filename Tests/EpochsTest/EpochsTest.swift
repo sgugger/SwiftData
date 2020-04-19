@@ -150,7 +150,8 @@ final class EpochsTests: XCTestCase {
    // samples of roughly the same lengths.
     let sortedDataset = nonuniformDataset.sorted { $0.shape[0] > $1.shape[0] }
       
-    let batches = Batches(of: 64, from: sortedDataset) { $0.paddedAndCollated(with: 0) }
+    let batches = sortedDataset.inBatches(of: 64)
+      .lazy.map { $0.paddedAndCollated(with: 0) }
     var previousSize: Int? = nil
     for batch in batches {
       if let size = previousSize {

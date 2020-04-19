@@ -31,3 +31,30 @@ extension Tensor: Collatable {
 }
 
 // TODO: derived conformance
+
+extension Collection where Element: Collatable {
+  /// The result of collating the elements of `self`.
+  public var collated: Element { .init(collating: self) }
+
+  /// Returns the elements of `self`, padded to maximal shape with `padValue`
+  /// and collated.
+  public func paddedAndCollated<Scalar : Numeric>(
+      with padValue: Scalar, padFirst: Bool = false
+  ) -> Element
+  where Element == Tensor<Scalar>
+  {
+    let firstShape = self.first!.shapeTensor
+    let otherShapes = self.dropFirst().lazy.map(\.shapeTensor)
+    let paddedShape
+        = otherShapes.reduce(firstShape) { TensorFlow.max($0, $1) }
+        .scalars.lazy.map { Int($0) }
+
+    let r = self.lazy.map { t in
+      t.padded(
+        forSizes: zip(t.shape, paddedShape).map {
+          return (before: padFirst ? $1 - $0 : 0, after: padFirst ? 0 : $1 - $0)},
+        with: padValue)
+    }
+    return r.collated
+  }
+}
