@@ -56,7 +56,7 @@ extension LazilySelected: RandomAccessCollection
 
 extension Collection {
   /// Returns elements selected from `self` according to 
-  func selecting<Selection: Collection>(_ selection: Selection)
+  public func selecting<Selection: Collection>(_ selection: Selection)
     -> LazilySelected<Self, Selection>
   {
     .init(base: self, selection: selection)
