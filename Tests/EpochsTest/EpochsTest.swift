@@ -46,10 +46,9 @@ final class EpochsTests: XCTestCase {
   // Tests with shuffle
   func testShuffle() {
     // Using `dataset.shuffled()` would break the laziness. Plus we would need
-    // to do it at each new epoch. `UniformTrainingEpochs` automatically handles
+    // to do it at each new epoch. `TrainingEpochs` automatically handles
     // shuffling (and re-shuffling at each epoch) without breaking the laziness.
-    let epochs = UniformTrainingEpochs(samples: dataset, batchSize: 64, 
-                                       entropy: pcg)
+    let epochs = TrainingEpochs(samples: dataset, batchSize: 64, entropy: pcg)
     var accessed = Array(0..<512)
     for batches in epochs.prefix(10) {
       resetRawItems()
@@ -74,10 +73,10 @@ final class EpochsTests: XCTestCase {
     
   // Tests with shuffle
   func testRemainderDropped() {
-    // `UniformTrainingEpochs` automatically drops the remainder batch if it has
+    // `TrainingEpochs` automatically drops the remainder batch if it has
     // less than `batchSize` elements.
-    let epochs = UniformTrainingEpochs(samples: dataset[..<500], batchSize: 64, 
-                                       entropy: pcg)
+    let epochs = TrainingEpochs(samples: dataset[..<500], batchSize: 64, 
+                                entropy: pcg)
     let samplesCount = 500 - 500 % 64
     var accessed = Array(0..<samplesCount)
     for batches in epochs.prefix(2) {
