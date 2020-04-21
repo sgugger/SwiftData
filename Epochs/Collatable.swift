@@ -1,4 +1,4 @@
-// Copyright 2019 The TensorFlow Authors. All Rights Reserved.
+// Copyright 2020 The TensorFlow Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
 
 import TensorFlow
 
-/// Types whose elements can be collated in some higher-rank element of the 
-/// same type (example: tensors, tuple of tensors)
+/// Types whose elements can be collated in some higher-rank element of the same
+/// type (example: tensors, tuple of tensors)
 public protocol Collatable {
   init<BatchSamples: Collection>(collating: BatchSamples) 
   where BatchSamples.Element==Self
@@ -23,11 +23,11 @@ public protocol Collatable {
 
 // Tensor are collated using stacking
 extension Tensor: Collatable {
-    public init<BatchSamples: Collection>(collating: BatchSamples)
-    where BatchSamples.Element==Self { 
-        let samples = Array(collating.indices).concurrentMap { collating[$0] }
-        self.init(stacking: samples) 
-    }
+  public init<BatchSamples: Collection>(collating: BatchSamples)
+  where BatchSamples.Element==Self { 
+    let samples = Array(collating.indices).concurrentMap { collating[$0] }
+    self.init(stacking: samples) 
+  }
 }
 
 // TODO: derived conformance

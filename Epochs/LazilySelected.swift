@@ -1,10 +1,24 @@
+// Copyright 2020 The TensorFlow Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 /// A lazy selection of elements, in a given order, from some base collection.
 public struct LazilySelected<Base: Collection, Selection: Collection>
   where Selection.Element == Base.Index
 {
-  /// The order that base elements appear in `self`
+  /// The order that base elements appear in `self`.
   private let selection: Selection
-  /// The base collection  
+  /// The base collection.
   private let base: Base
   
   /// Creates an instance from `base` and `selection`.
@@ -43,7 +57,7 @@ extension LazilySelected: BidirectionalCollection
 extension LazilySelected: RandomAccessCollection
   where Selection: BidirectionalCollection
 {
-  /// Returns the position `n` places from `i`
+  /// Returns the position `n` places from `i`.
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     selection.index(before: i)
   }
@@ -55,7 +69,7 @@ extension LazilySelected: RandomAccessCollection
 }
 
 extension Collection {
-  /// Returns elements selected from `self` according to 
+  /// Returns elements selected from `self` according to `selection`.
   public func selecting<Selection: Collection>(_ selection: Selection)
     -> LazilySelected<Self, Selection>
   {

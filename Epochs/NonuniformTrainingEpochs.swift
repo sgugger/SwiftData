@@ -1,5 +1,19 @@
+// Copyright 2020 The TensorFlow Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 /// An infinite sequence of collections of sample batches suitable for training
-/// a DNN when samples are nonuniform.
+/// a DNN when samples are nonuniform (e.g. not all of the same "size").
 ///
 /// - Parameter `Samples`: the type of collection from which samples will be
 ///   drawn.
@@ -7,11 +21,10 @@
 ///   each epoch.  See the `init` documentation for details.
 ///
 /// The batches in each epoch:
-/// - all have exactly the same size.
+/// - all have exactly the same number of samples.
 /// - are formed from samples of similar size.
 /// - start with a batch whose maximum sample size is the maximum size over all
 ///   samples used in the epoch.
-/// - 
 public final class NonuniformTrainingEpochs<
   Samples: Collection,
   Entropy: RandomNumberGenerator
@@ -40,13 +53,13 @@ public final class NonuniformTrainingEpochs<
   /// `batchSize`.
   ///
   /// - Parameters:
-  ///   - entropy: a source of randomness used to shuffle sample ordering.  It
+  ///   - entropy: a source of randomness used to shuffle sample ordering. It
   ///     will be stored in `self`, so if it is only pseudorandom and has value
   ///     semantics, the sequence of epochs is determinstic and not dependent on
   ///     other operations.
   ///   - batchesPerSort: the number of batches across which to group sample
   ///     sizes similarly, or `nil` to indicate that the implementation should
-  ///     choose a number.  Choosing too high can destroy the effects of sample
+  ///     choose a number. Choosing too high can destroy the effects of sample
   ///     shuffling in many training schemes, leading to poor results.  Choosing
   ///     too low will reduce the similarity of sizes in a given batch, leading
   ///     to inefficiency.
@@ -125,6 +138,7 @@ public func nonuniformInferenceBatches<Samples: Collection>(
   samples: Samples, batchSize: Int, areInAscendingSizeOrder:
       @escaping (Samples.Element, Samples.Element) -> Bool
 ) -> Slices<LazilySelected<Samples, [Samples.Index]>>{
+  // The order of the samples.
   let sampleOrder = Array(samples.indices).sorted { 
       areInAscendingSizeOrder(samples[$0], samples[$1])
   }
