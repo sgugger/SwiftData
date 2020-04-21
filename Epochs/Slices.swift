@@ -3,12 +3,12 @@
 /// length.
 ///
 /// The elements of this collection, except for the last, all have a `count` of
-/// `maxLength`.  The last one's `count` is `base.count % maxLength.`
+/// `batchSize`.  The last one's `count` is `base.count % batchSize.`
 public struct Slices<Base: Collection> {
   /// The collection from which slices will be drawn.
   private let base: Base
   
-  /// The maximum length of the slices
+  /// The maximum length of the slices.
   private let batchSize: Int
 
   public init(_ base: Base, batchSize: Int) {
@@ -62,9 +62,3 @@ extension Collection {
     Slices(self, batchSize: batchSize)
   }
 }
-
-// FIXME: Batches is now just
-//
-//   Slices(batchSamples, elementMaxLength: batchSize).lazy.map(transform)
-//
-// so we should refactor :-)

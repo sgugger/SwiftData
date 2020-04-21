@@ -637,31 +637,3 @@ extension Collection {
     return l
   }
 }
-
-
-extension MutableCollectionAlgorithms where Self: BidirectionalCollection {
-  mutating func quickSelect(
-      k: Int, by areInIncreasingOrder: (Element, Element) -> Bool
-  ) -> Element? {
-    if startIndex == endIndex { return nil }
-    if index(after: startIndex) == endIndex { 
-      if k==1 { return self[startIndex] }
-      return nil
-    }
-      
-    let pivotIndex = index(startIndex, offsetBy: Int.random(in: 0..<count))
-    let pivot = self[pivotIndex]
-    let lastIndex = index(before: endIndex)
-    swapAt(pivotIndex, lastIndex)
-      
-    let i = stablePartition() { !areInIncreasingOrder($0, pivot) }
-    // Make sure the pivot is the first element of the suffix
-    swapAt(i, lastIndex)
-  
-    let d = distance(from: startIndex, to: i)
-    if d == k-1 { return pivot }
-    if d < k-1 { return self[index(after:i)...].quickSelect(k: k-d-1, 
-                                    by: areInIncreasingOrder) }
-    return self[..<i].quickSelect(k: k, by: areInIncreasingOrder)
-}
-}
