@@ -49,10 +49,10 @@ extension Collection where Element: Collatable {
         = otherShapes.reduce(firstShape) { TensorFlow.max($0, $1) }
         .scalars.lazy.map { Int($0) }
 
-    let r = self.lazy.map { t in
-      t.padded(
-        forSizes: zip(t.shape, paddedShape).map {
-          return (before: padFirst ? $1 - $0 : 0, after: padFirst ? 0 : $1 - $0)},
+    let r = self.lazy.map { (t: Element) -> Element in
+      let fill = paddedShape[0] - t.shape[0]
+      return t.padded(
+        forSizes: [(before: padFirst ? fill : 0, after: padFirst ? 0 : fill)],
         with: padValue)
     }
     return r.collated
