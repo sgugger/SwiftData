@@ -143,15 +143,12 @@ final class EpochsTests: XCTestCase {
   // In our previous example, another way to be memory efficient is to batch
   // samples of roughly the same lengths.
   func testSortAndPadding() {
-    // Use with a sampler
-    // In our previous example, another way to be memory efficient is to batch
-   // samples of roughly the same lengths.
-    let sortedDataset = nonuniformDataset.sorted { $0.shape[0] > $1.shape[0] }
-      
-    let batches = sortedDataset.inBatches(of: 64)
-      .lazy.map { $0.paddedAndCollated(with: 0) }
+    // `nonUniformInferenceBatches` lazily sorts the samples
+    let batches = nonuniformInferenceBatches(
+      samples: nonuniformDataset, batchSize: 64) { $0.shape[0] > $1.shape[0] }
     var previousSize: Int? = nil
-    for batch in batches {
+    for batchSamples in batches {
+      let batch = batchSamples.paddedAndCollated(with: 0)
       if let size = previousSize {
         XCTAssert(size >= batch.shape[1])
       }

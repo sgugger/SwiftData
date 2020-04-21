@@ -124,7 +124,7 @@ public final class NonuniformTrainingEpochs<
 public func nonuniformInferenceBatches<Samples: Collection>(
   samples: Samples, batchSize: Int, areInAscendingSizeOrder:
       @escaping (Samples.Element, Samples.Element) -> Bool
-) -> Slices<LazilySelected<Samples, [Samples.Indices]>>{
+) -> Slices<LazilySelected<Samples, [Samples.Index]>>{
   let sampleOrder = Array(samples.indices).sorted { 
       areInAscendingSizeOrder(samples[$0], samples[$1])
   }
