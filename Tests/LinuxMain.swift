@@ -1,6 +1,6 @@
-import BatcherTest
-import Batcher1Test
-import Batcher2Test
+//import BatcherTest
+//import Batcher1Test
+//import Batcher2Test
 import EpochsTest
 import XCTest
 
