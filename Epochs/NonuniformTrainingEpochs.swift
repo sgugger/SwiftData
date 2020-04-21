@@ -112,3 +112,21 @@ public final class NonuniformTrainingEpochs<
       .inBatches(of: batchSize)
   }
 }
+
+/// Build batches for inference drawing samples from `samples` into batches of 
+/// `batchSize`.
+///
+/// - Parameters:
+///   - areInAscendingSizeOrder: a predicate that returns `true` iff the size
+///     of the first parameter is less than that of the second.
+///
+/// Sorts `samples` without loading every sample in memory in a single array.
+public func nonuniformInferenceBatches<Samples: Collection>(
+  samples: Samples, batchSize: Int, areInAscendingSizeOrder:
+      @escaping (Samples.Element, Samples.Element) -> Bool
+) -> Slices<LazilySelected<Samples, [Samples.Indices]>>{
+  let sampleOrder = Array(samples.indices).sorted { 
+      areInAscendingSizeOrder(samples[$0], samples[$1])
+  }
+  return samples.selecting(sampleOrder).inBatches(of: batchSize)
+}
