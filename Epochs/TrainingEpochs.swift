@@ -73,3 +73,15 @@ public final class TrainingEpochs<
       .inBatches(of: batchSize)
   }
 }
+
+public extension TrainingEpochs where Entropy == SystemRandomNumberGenerator {
+   /// Creates an instance drawing samples from `samples` into batches of size
+  /// `batchSize`.
+  convenience init(
+    samples: Samples,
+    batchSize: Int
+  ) {
+    self.init(samples: samples, batchSize: batchSize,
+         entropy: SystemRandomNumberGenerator())
+  }
+}

@@ -126,6 +126,37 @@ public final class NonuniformTrainingEpochs<
   }
 }
 
+public extension NonuniformTrainingEpochs 
+where Entropy == SystemRandomNumberGenerator {
+   /// Creates an instance drawing samples from `samples` into batches of size
+  /// `batchSize`.
+  ///
+  /// - Parameters:
+  ///   - batchesPerSort: the number of batches across which to group sample
+  ///     sizes similarly, or `nil` to indicate that the implementation should
+  ///     choose a number. Choosing too high can destroy the effects of sample
+  ///     shuffling in many training schemes, leading to poor results.  Choosing
+  ///     too low will reduce the similarity of sizes in a given batch, leading
+  ///     to inefficiency.
+  ///   - areInAscendingSizeOrder: a predicate that returns `true` iff the size
+  ///     of the first parameter is less than that of the second.
+  convenience init(
+    samples: Samples,
+    batchSize: Int,
+    batchesPerSort: Int? = nil,
+    areInAscendingSizeOrder:
+      @escaping (Samples.Element, Samples.Element) -> Bool
+  ) {
+    self.init(
+      samples: samples,
+      batchSize: batchSize, 
+      entropy: SystemRandomNumberGenerator(),
+      batchesPerSort: batchesPerSort,
+      areInAscendingSizeOrder: areInAscendingSizeOrder
+    )
+  }
+}
+
 /// Build batches for inference drawing samples from `samples` into batches of 
 /// `batchSize`.
 ///
