@@ -128,7 +128,8 @@ final class EpochsTests: XCTestCase {
         let currentShape = nonuniformDataset[i * 64 + k].shape[0]
         XCTAssertEqual(
           b[k, currentShape..<expectedShape], 
-          Tensor<Int32>(repeating: padValue, shape: [expectedShape - currentShape]))         
+          Tensor<Int32>(repeating: padValue, 
+                        shape: [expectedShape - currentShape]))         
       }
     }
   }
