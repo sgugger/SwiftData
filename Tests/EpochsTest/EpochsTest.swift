@@ -145,7 +145,7 @@ final class EpochsTests: XCTestCase {
   func testSortAndPadding() {
     // `nonUniformInferenceBatches` lazily sorts the samples
     let batches = nonuniformInferenceBatches(
-      samples: nonuniformDataset, batchSize: 64) { $0.shape[0] > $1.shape[0] }
+      samples: nonuniformDataset, batchSize: 64) { $0.shape[0] < $1.shape[0] }
     var previousSize: Int? = nil
     for batchSamples in batches {
       let batch = batchSamples.paddedAndCollated(with: 0)

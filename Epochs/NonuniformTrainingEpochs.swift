@@ -140,7 +140,7 @@ public func nonuniformInferenceBatches<Samples: Collection>(
 ) -> Slices<LazilySelected<Samples, [Samples.Index]>>{
   // The order of the samples.
   let sampleOrder = Array(samples.indices).sorted { 
-      areInAscendingSizeOrder(samples[$0], samples[$1])
+      areInAscendingSizeOrder(samples[$1], samples[$0])
   }
   return samples.selecting(sampleOrder).inBatches(of: batchSize)
 }
