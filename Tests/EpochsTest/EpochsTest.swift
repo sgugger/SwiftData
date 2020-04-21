@@ -26,7 +26,7 @@ final class EpochsTests: XCTestCase {
   var dataset: LazyMapSequence<[Tracker], Tensor<Float>> { 
     return rawItems.lazy.map { (x: Tracker) -> Tensor<Float> in
       x.accessed = true
-      return Tensor<Float>(randomNormal: [224, 224, 3]) }
+      return Tensor<Float>(randomNormal: [224, 224, 3], seed: tfSeed) }
   }
  
   func testBaseUse() {
