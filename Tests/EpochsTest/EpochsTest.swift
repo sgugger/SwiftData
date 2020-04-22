@@ -1,10 +1,59 @@
+// Copyright 2019 The TensorFlow Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//import Epochs
+//import XCTest
+
 import TensorFlow
-import Epochs
-import XCTest
 
-var pcg = ARC4RandomNumberGenerator(seed: [42])
+func XCTAssert(
+  _ expression: @autoclosure () -> Bool,
+  _ message: @autoclosure () -> String = "",
+  file: StaticString = #file, line: UInt = #line
+) {
+  assert(expression(), message(), file: file, line: line)
+}
 
-final class EpochsTests: XCTestCase {
+func XCTAssertFalse(
+  _ expression: @autoclosure () -> Bool,
+  _ message: @autoclosure () -> String = "",
+  file: StaticString = #file, line: UInt = #line
+) {
+  assert(!expression(), message(), file: file, line: line)
+}
+
+func XCTAssertEqual<T: Equatable>(
+  _ expression: @autoclosure () -> T,
+  _ expression1: @autoclosure () -> T,
+  _ message: @autoclosure () -> String = "",
+  file: StaticString = #file, line: UInt = #line
+) {
+  assert(expression() == expression1(), message(), file: file, line: line)
+}
+
+func XCTAssertNotEqual<T: Equatable>(
+  _ expression: @autoclosure () -> T,
+  _ expression1: @autoclosure () -> T,
+  _ message: @autoclosure () -> String = "",
+  file: StaticString = #file, line: UInt = #line
+) {
+  assert(expression() != expression1(), message(), file: file, line: line)
+}
+
+var rng = ARC4RandomNumberGenerator(seed: [42])
+
+final class EpochsTests/*: XCTestCase*/ {
   func testBaseUse() {
     // A mock item type that tracks if it was accessed or not
     class Tracker {
@@ -39,7 +88,7 @@ final class EpochsTests: XCTestCase {
       return Tensor<Int32>(zeros: [32, 32, 3]) + i
     }
       
-    let epochs = TrainingEpochs(samples: dataset, batchSize: 64, entropy: pcg)
+    let epochs = TrainingEpochs(samples: dataset, batchSize: 64, entropy: rng)
     var accessed = Array(0..<512)
     for batches in epochs.prefix(10) {
       var newAccessed: [Int] = []
@@ -70,7 +119,7 @@ final class EpochsTests: XCTestCase {
       return Tensor<Int32>(zeros: [32, 32, 3]) + i
     }
     let epochs = TrainingEpochs(samples: dataset, batchSize: 64, 
-                                entropy: pcg)
+                                entropy: rng)
     let samplesCount = 500 - 500 % 64
     var accessed = Array(0..<samplesCount)
     for batches in epochs.prefix(2) {
@@ -100,7 +149,7 @@ final class EpochsTests: XCTestCase {
     for _ in 0..<512 {
       dataset.append(Tensor<Int32>(
                        repeating: 1,
-                       shape: [Int.random(in: 1...200, using: &pcg)]
+                       shape: [Int.random(in: 1...200, using: &rng)]
                     ))
     }
     return dataset
@@ -224,13 +273,13 @@ final class EpochsTests: XCTestCase {
     let sampleCount = 503
     let batchSize = 7
     let samples = (0..<sampleCount).map {
-      _ in Sample.init(size: Int.random(in: 0..<1000, using: &pcg))
+      _ in Sample.init(size: Int.random(in: 0..<1000, using: &rng))
     }
 
     let epochs = NonuniformTrainingEpochs(
       samples: samples,
       batchSize: batchSize,
-      entropy: pcg) { $0.size < $1.size }
+      entropy: rng) { $0.size < $1.size }
 
     // The first sample ordering observed during this test.
     var observedSampleOrder: [ObjectIdentifier]?
@@ -266,10 +315,10 @@ final class EpochsTests: XCTestCase {
 
 extension EpochsTests {
   static var allTests = [
-    ("testAllPadding", testAllPadding),
     ("testBaseUse", testBaseUse),
     ("testShuffle", testShuffle),
     ("testRemainderDropped", testRemainderDropped),
+    ("testAllPadding", testAllPadding),
     ("testSortAndPadding", testSortAndPadding),
     ("testLanguageModel", testLanguageModel),
     ("testLanguageModelShuffled", testLanguageModelShuffled),
