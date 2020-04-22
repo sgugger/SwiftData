@@ -3,36 +3,25 @@ import Epochs
 import XCTest
 
 var pcg = ARC4RandomNumberGenerator(seed: [42])
-let tfSeed: TensorFlowSeed = (
-  graph: Int32.random(in:Int32.min..<Int32.max, using: &pcg), 
-  op: Int32.random(in:Int32.min..<Int32.max, using: &pcg))
 
 final class EpochsTests: XCTestCase {
-  // A mock item type that tracks if it was accessed or not
-  class Tracker {
-    var accessed: Bool = false
-  }
-
-  let rawItems: [Tracker] = Array(0..<512).map{ _ in Tracker() }  
-   
-  func resetRawItems() {
-    let _ = rawItems.map { $0.accessed = false }
-  }
-   
-  // A dataset that applies a lazy transformation on those raw items (think
-  // opening an image
-  var dataset: LazyMapSequence<[Tracker], Tensor<Float>> { 
-    return rawItems.lazy.map { (x: Tracker) -> Tensor<Float> in
-      x.accessed = true
-      return Tensor<Float>(randomNormal: [224, 224, 3], seed: tfSeed) }
-  }
- 
   func testBaseUse() {
+    // A mock item type that tracks if it was accessed or not
+    class Tracker {
+      var accessed: Bool = false
+    }
+    
     // `inBatches` splits our dataset in batches, the `collated` property is
     // defined for any struct conforming to `Collatable`
+    let rawItems = Array(0..<512).map{ _ in Tracker() } 
+    let dataset = rawItems.lazy.map { (x: Tracker) -> Tensor<Float> in
+      x.accessed = true
+      // Using a random tensor here is not thread-safe and will result in race
+      // conditions.
+      return Tensor<Float>(randomNormal: [224, 224, 3])
+    } 
     let batches = dataset.inBatches(of: 64).lazy.map(\.collated)
     
-    resetRawItems()
     for (i, batch) in batches.enumerated() {
       XCTAssertEqual(batch.shape, TensorShape([64, 224, 224, 3]))
       let limit = (i + 1) * 64
@@ -46,17 +35,21 @@ final class EpochsTests: XCTestCase {
     // Using `dataset.shuffled()` would break the laziness. Plus we would need
     // to do it at each new epoch. `TrainingEpochs` automatically handles
     // shuffling (and re-shuffling at each epoch) without breaking the laziness.
+    let dataset = (0..<512).lazy.map { (i: Int32) -> Tensor<Int32> in
+      return Tensor<Int32>(zeros: [32, 32, 3]) + i
+    }
+      
     let epochs = TrainingEpochs(samples: dataset, batchSize: 64, entropy: pcg)
     var accessed = Array(0..<512)
     for batches in epochs.prefix(10) {
-      resetRawItems()
       var newAccessed: [Int] = []
       for batch in batches {
         XCTAssertEqual(batches.count, 8)
         let collatedBatch = batch.collated
-        XCTAssertEqual(collatedBatch.shape, TensorShape([64, 224, 224, 3]))
+        XCTAssertEqual(collatedBatch.shape, TensorShape([64, 32, 32, 3]))
           
-        newAccessed += Array(0..<512).filter { rawItems[$0].accessed }    
+        newAccessed += Array(0..<64).map {
+          Int(collatedBatch[$0, 0, 0, 0].scalarized()) }    
       }
       XCTAssertNotEqual(accessed, newAccessed, 
                        "Dataset should have been reshuffled.")
@@ -64,7 +57,7 @@ final class EpochsTests: XCTestCase {
       accessed = newAccessed
       let uniqueSamples = Set(accessed)
       XCTAssertEqual(
-        uniqueSamples.count, rawItems.count,
+        uniqueSamples.count, 512,
         "Every epoch sample should be drawn from a different input sample.")
     }
   }
@@ -73,19 +66,21 @@ final class EpochsTests: XCTestCase {
   func testRemainderDropped() {
     // `TrainingEpochs` automatically drops the remainder batch if it has
     // less than `batchSize` elements.
-    let epochs = TrainingEpochs(samples: dataset[..<500], batchSize: 64, 
+    let dataset = (0..<500).lazy.map { (i: Int32) -> Tensor<Int32> in
+      return Tensor<Int32>(zeros: [32, 32, 3]) + i
+    }
+    let epochs = TrainingEpochs(samples: dataset, batchSize: 64, 
                                 entropy: pcg)
     let samplesCount = 500 - 500 % 64
     var accessed = Array(0..<samplesCount)
     for batches in epochs.prefix(2) {
       XCTAssertEqual(batches.count, 7)
-      resetRawItems()
       var newAccessed: [Int] = []
       for batch in batches {
         let collatedBatch = batch.collated
-        XCTAssertEqual(collatedBatch.shape, TensorShape([64, 224, 224, 3]))
-          
-        newAccessed += Array(0..<512).filter { rawItems[$0].accessed }    
+        XCTAssertEqual(collatedBatch.shape, TensorShape([64, 32, 32, 3]))
+        newAccessed += Array(0..<64).map {
+          Int(collatedBatch[$0, 0, 0, 0].scalarized()) }    
       }
       XCTAssertNotEqual(accessed, newAccessed, 
                        "Dataset should have been reshuffled.")
@@ -104,10 +99,8 @@ final class EpochsTests: XCTestCase {
     var dataset: [Tensor<Int32>] = []
     for _ in 0..<512 {
       dataset.append(Tensor<Int32>(
-                       randomUniform: [Int.random(in: 1...200, using: &pcg)], 
-                       lowerBound: Tensor<Int32>(0), 
-                       upperBound: Tensor<Int32>(100),
-                       seed: tfSeed
+                       repeating: 1,
+                       shape: [Int.random(in: 1...200, using: &pcg)]
                     ))
     }
     return dataset
@@ -233,7 +226,6 @@ final class EpochsTests: XCTestCase {
     let samples = (0..<sampleCount).map {
       _ in Sample.init(size: Int.random(in: 0..<1000, using: &pcg))
     }
-    // TODO: More thorough testing.
 
     let epochs = NonuniformTrainingEpochs(
       samples: samples,
@@ -243,7 +235,7 @@ final class EpochsTests: XCTestCase {
     // The first sample ordering observed during this test.
     var observedSampleOrder: [ObjectIdentifier]?
 
-    for batches in epochs.prefix(20) {
+    for batches in epochs.prefix(10) {
       XCTAssertEqual(batches.count, sampleCount / batchSize)
       XCTAssert(batches.allSatisfy { $0.count == batchSize })
       let epochSamples = batches.joined()
@@ -274,10 +266,10 @@ final class EpochsTests: XCTestCase {
 
 extension EpochsTests {
   static var allTests = [
+    ("testAllPadding", testAllPadding),
     ("testBaseUse", testBaseUse),
     ("testShuffle", testShuffle),
     ("testRemainderDropped", testRemainderDropped),
-    ("testAllPadding", testAllPadding),
     ("testSortAndPadding", testSortAndPadding),
     ("testLanguageModel", testLanguageModel),
     ("testLanguageModelShuffled", testLanguageModelShuffled),

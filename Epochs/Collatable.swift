@@ -23,10 +23,10 @@ public protocol Collatable {
 
 // Tensor are collated using stacking
 extension Tensor: Collatable {
-  public init<BatchSamples: Collection>(collating: BatchSamples)
+  public init<BatchSamples: Collection>(collating samples: BatchSamples)
   where BatchSamples.Element==Self { 
-    let samples = Array(collating.indices).concurrentMap { collating[$0] }
-    self.init(stacking: samples) 
+    let batchSamples = samples.indices.concurrentMap { samples[$0] }
+    self.init(stacking: batchSamples) 
   }
 }
 
@@ -49,10 +49,10 @@ extension Collection where Element: Collatable {
         = otherShapes.reduce(firstShape) { TensorFlow.max($0, $1) }
         .scalars.lazy.map { Int($0) }
 
-    let r = self.lazy.map { (t: Element) -> Element in
-      let fill = paddedShape[0] - t.shape[0]
-      return t.padded(
-        forSizes: [(before: padFirst ? fill : 0, after: padFirst ? 0 : fill)],
+    let r = self.lazy.map { t in
+      t.padded(
+        forSizes: zip(t.shape, paddedShape).map {
+          return (before: padFirst ? $1 - $0 : 0, after: padFirst ? 0 : $1 - $0)},
         with: padValue)
     }
     return r.collated
