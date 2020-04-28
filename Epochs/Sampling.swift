@@ -13,14 +13,13 @@
 // limitations under the License.
 
 /// A lazy selection of elements, in a given order, from some base collection.
-public struct LazilySelected<Base: Collection, Selection: Collection>
-  where Selection.Element == Base.Index
-{
+public struct Sampling<Base: Collection, Selection: Collection>
+where Selection.Element == Base.Index {
   /// The order that base elements appear in `self`.
   private let selection: Selection
   /// The base collection.
   private let base: Base
-  
+
   /// Creates an instance from `base` and `selection`.
   public init(base: Base, selection: Selection) {
     self.selection = selection
@@ -28,9 +27,9 @@ public struct LazilySelected<Base: Collection, Selection: Collection>
   }
 }
 
-extension LazilySelected: Collection {
+extension Sampling: Collection {
   public typealias Element = Base.Element
-    
+
   /// A type whose instances represent positions in `self`.
   public typealias Index = Selection.Index
 
@@ -38,7 +37,7 @@ extension LazilySelected: Collection {
   public var startIndex: Index { selection.startIndex }
 
   /// The position one past the last element.
-  public var endIndex: Index { selection.endIndex  }
+  public var endIndex: Index { selection.endIndex }
 
   /// Returns the element at `i`.
   public subscript(i: Index) -> Element { base[selection[i]] }
@@ -47,19 +46,30 @@ extension LazilySelected: Collection {
   public func index(after i: Index) -> Index { selection.index(after: i) }
 }
 
-extension LazilySelected: BidirectionalCollection
-  where Selection: BidirectionalCollection
-{
+extension Sampling: BidirectionalCollection
+where Selection: BidirectionalCollection {
   /// Returns the position after `i`.
   public func index(before i: Index) -> Index { selection.index(before: i) }
 }
 
-extension LazilySelected: RandomAccessCollection
-  where Selection: BidirectionalCollection
-{
+extension Sampling: RandomAccessCollection
+where Selection: BidirectionalCollection {
   /// Returns the position `n` places from `i`.
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     selection.index(before: i)
+  }
+  
+  // Needed because of https://bugs.swift.org/browse/SR-12692
+  @inlinable
+  public func index(
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
+  ) -> Index? {
+    // FIXME: swift-3-indexing-model: tests.
+    let l = self.distance(from: i, to: limit)
+    if distance > 0 ? l >= 0 && l < distance : l <= 0 && distance < l {
+      return nil
+    }
+    return index(i, offsetBy: distance)
   }
 
   /// Returns the number of elements in `self[start..<end]`.
@@ -69,9 +79,12 @@ extension LazilySelected: RandomAccessCollection
 }
 
 extension Collection {
-  /// Returns elements selected from `self` according to `selection`.
-  public func selecting<Selection: Collection>(_ selection: Selection)
-    -> LazilySelected<Self, Selection>
+  /// Returns a collection of elements of `self` at the positions and in the order
+  /// specified by `selection` without reading the elements of either collection.
+  ///
+  /// - Complexity: O(1)
+  public func sampled<Selection: Collection>(at selection: Selection)
+    -> Sampling<Self, Selection>
   {
     .init(base: self, selection: selection)
   }

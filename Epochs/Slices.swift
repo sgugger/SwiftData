@@ -17,27 +17,29 @@
 /// length.
 ///
 /// The elements of this collection, except for the last, all have a `count` of
-/// `batchSize`.  The last one's `count` is `base.count % batchSize.`
+/// `batchSize`, unless `Base.count % batchSize !=0`, in which case
+/// the last batch's `count` is `base.count % batchSize.`
 public struct Slices<Base: Collection> {
   /// The collection from which slices will be drawn.
   private let base: Base
-  
+
   /// The maximum length of the slices.
   private let batchSize: Int
-
+    
+  /// Creates on instance on `base` with `batchSize`.
   public init(_ base: Base, batchSize: Int) {
     self.base = base
     self.batchSize = batchSize
   }
 }
 
-extension Slices : Collection {
+extension Slices: Collection {
   /// A position in `Slices`.
-  public struct Index : Comparable {
+  public struct Index: Comparable {
     /// The range of base indices covered by the element at this position.
     var focus: Range<Base.Index>
 
-    /// Returns true if `l` precedes `r` in the collection.
+    /// Returns true iff `l` precedes `r` in the collection.
     public static func < (l: Index, r: Index) -> Bool {
       l.focus.lowerBound < r.focus.lowerBound
     }
@@ -52,13 +54,13 @@ extension Slices : Collection {
     base.index(i, offsetBy: batchSize, limitedBy: base.endIndex)
       ?? base.endIndex
   }
-  
+
   /// Returns the index after `i`.
   public func index(after i: Index) -> Index {
     Index(focus: i.focus.upperBound..<sliceBoundary(after: i.focus.upperBound))
   }
 
-  /// Returns the first position ini `self`.
+  /// Returns the first position in `self`.
   public var startIndex: Index {
     Index(focus: base.startIndex..<sliceBoundary(after: base.startIndex))
   }
@@ -71,7 +73,7 @@ extension Slices : Collection {
 
 extension Collection {
   /// Returns the longest non-overlapping slices of `self`, starting with its
-  /// first element, and having a maximum length of `batchSize`.
+  /// first element, having a maximum length of `batchSize`.
   public func inBatches(of batchSize: Int) -> Slices<Self> {
     Slices(self, batchSize: batchSize)
   }
